@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="An interactive low-poly simulation of Salesforce Data 360: follow records from source to activation.">
+<meta name="description" content="An interactive low-poly simulation of Salesforce Data 360: follow records from source to activation, with a challenge at every stop.">
 <meta name="color-scheme" content="dark light">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23141A24'/%3E%3Cpath d='M6 18l10-6 10 6-10 6z' fill='%234FC4B8'/%3E%3Cpath d='M11 15l5-3 5 3-5 3z' fill='%23E3B23C'/%3E%3C/svg%3E">
 <title>Data 360 Tycoon</title>
@@ -281,6 +281,94 @@
   #quizbox .opt.wrong { border-color: var(--coral); color: var(--coral); }
   #quizbox .opt:disabled { cursor: default; }
 
+  /* order puzzle */
+
+  #quizbox .seq {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 26px;
+    padding: 7px 9px;
+    border: 1px dashed var(--panel-edge);
+    border-radius: 4px;
+    align-items: center;
+  }
+
+  #quizbox .seq .ph {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  #quizbox .seq .tok {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    padding: 2px 6px;
+  }
+
+  #quizbox .opt .pos {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    padding: 0 4px;
+    margin-right: 7px;
+  }
+
+  /* compute puzzle */
+
+  /* Deliberately NOT called .hint: the controls hint uses that class and is
+     display:none on small screens, which was hiding the formula too. */
+  #quizbox .formula {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--gold);
+    background: rgba(227, 178, 60, 0.09);
+    border: 1px solid rgba(227, 178, 60, 0.28);
+    border-radius: 3px;
+    padding: 8px 11px;
+    letter-spacing: 0.02em;
+  }
+
+  #quizbox .calc { display: flex; gap: 8px; align-items: stretch; }
+
+  #quizbox .calc input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 15px;
+    padding: 9px 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  #quizbox .calc input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+  #quizbox .calc input.right { border-color: var(--accent); color: var(--accent); }
+  #quizbox .calc input.wrong { border-color: var(--coral); color: var(--coral); }
+
+  #quizbox .calc button {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 4px;
+    padding: 0 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  #quizbox .calc button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   #quizfb { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 0; display: none; }
   #quizfb.show { display: block; }
   #quizfb b { color: var(--accent); }
@@ -336,6 +424,10 @@
       <span class="k">Credits burned <span style="text-transform:none">(illustrative)</span></span>
       <span class="v hot" id="g-cred">0</span>
     </div>
+    <div class="gauge">
+      <span class="k">Challenges</span>
+      <span class="v" id="g-score">0 / 15</span>
+    </div>
     <div id="zc">
       <span class="k" style="font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Warehouse mode</span>
       <span class="switch">
@@ -373,7 +465,7 @@
 
   <div id="quiz" role="dialog" aria-modal="true" aria-labelledby="quizq">
     <div id="quizbox">
-      <span class="chip">Checkpoint</span>
+      <span class="chip" id="quizkind">Checkpoint</span>
       <h3 id="quizq"></h3>
       <div class="opts" id="quizopts"></div>
       <p id="quizfb"></p>
@@ -540,6 +632,167 @@
     s.gx = g.x; s.gy = g.y; s.idx = i;
   });
 
+  // ---------------------------------------------------------------- puzzles
+  //
+  // Keyed by stop name so the verified stop content above stays untouched.
+  // Three types: choice, order (click the sequence), compute (work the
+  // formula). Most ask about an EARLIER stop on purpose - answering about a
+  // previous step is what makes it stick, per the method this was built with.
+
+  var PUZZLES = {
+    'Source Depots': {
+      type: 'choice',
+      q: 'Three systems hold records about the same people, in three different shapes. What has to happen before any of it is useful?',
+      opts: [
+        'Delete the duplicates',
+        'Reshape them to a shared model, then link them',
+        'Pick the most trusted system and ignore the rest',
+        'Load them into a reporting dashboard'
+      ],
+      right: 1,
+      fb: '<b>Reshape, then link.</b> Harmonize into a canonical model first, resolve identity second. Neither step deletes anything - that is the whole route ahead of you.'
+    },
+
+    'Data Stream': {
+      type: 'choice',
+      q: 'You are configuring a nightly sync of customer records. Batch or streaming?',
+      opts: [
+        'Streaming - the data is always fresher',
+        'Batch - streaming consumes more credits for equivalent work',
+        'Either, the cost is identical',
+        'Streaming, batch is deprecated'
+      ],
+      right: 1,
+      fb: '<b>Batch.</b> Streaming consuming more credits than batch is documented, unlike most rates you will read. Reach for real-time only where the use case genuinely needs it.'
+    },
+
+    'DLO Yard': {
+      type: 'choice',
+      recall: 'Data Stream',
+      q: 'A surname arrived misspelled from the source system. Where does the correction belong?',
+      opts: [
+        'Edit the value in the DLO',
+        'In the source system, or a transform downstream - the DLO stays faithful',
+        'Delete the row and re-ingest it',
+        'In the activation target'
+      ],
+      right: 1,
+      fb: '<b>Not in the DLO.</b> It is deliberately a faithful record of what arrived. That fidelity is what lets you audit and re-run everything downstream.'
+    },
+
+    'Transform Works': {
+      type: 'choice',
+      q: 'You ingested 40M rows. Only 6M are customers you will ever activate. When do you drop the rest?',
+      opts: [
+        'After segmentation, once you know who was targeted',
+        'Here, before modelling and identity resolution',
+        'At activation',
+        'Never - filtering loses data you may want later'
+      ],
+      right: 1,
+      fb: '<b>Here.</b> Every stop after this one is metered per million rows, and unification is the priciest of them. This is the cheapest place to drop dead weight.'
+    },
+
+    'Mapping Hall': {
+      type: 'order',
+      q: 'Click the four stages in the order a record actually travels through them.',
+      items: ['DMO (canonical)', 'The source system', 'Unified Individual', 'DLO (raw)'],
+      answer: [1, 3, 0, 2],
+      fb: '<b>Source, DLO, DMO, Unified.</b> Raw first and untouched, canonical second, identity resolved last. That spine explains almost every design rule in the platform.'
+    },
+
+    'Match Plaza': {
+      type: 'choice',
+      recall: 'Category Gate',
+      q: 'Rule one reads: fuzzy first name AND exact normalized address. Rule two reads: exact party identifier. When do two records link?',
+      opts: [
+        'Only when both rules pass',
+        'When either rule passes on its own',
+        'Only when every field in both rules matches',
+        'Fuzzy methods never produce a link'
+      ],
+      right: 1,
+      fb: '<b>Either.</b> Logic is AND within a rule, OR across rules. Each extra rule is another chance to link - and another chance to over-link, which is why you start narrow.'
+    },
+
+    'Reconciliation Tower': {
+      type: 'choice',
+      recall: 'Match Plaza',
+      q: 'Two sources give different email addresses for the same unified profile. What decides which one surfaces?',
+      opts: [
+        'The match rule that linked them',
+        'A reconciliation rule - Most Recent, Most Frequent, Source Priority',
+        'Whichever record was ingested first',
+        'The DLO with the most rows'
+      ],
+      right: 1,
+      fb: '<b>A reconciliation rule.</b> Match rules decide who is the same person. Reconciliation rules decide which value wins. Two different jobs, and people routinely conflate them.'
+    },
+
+    'Insights Foundry': {
+      type: 'compute',
+      q: 'A Calculated Insight processes 6,000,000 rows at a multiplier of 15. How many credits does one run cost?',
+      hint: 'credits = (d \u00f7 u) \u00d7 m,  where u = 1,000,000',
+      answer: 90,
+      fb: '(6,000,000 \u00f7 1,000,000) \u00d7 15 = <b>90 credits</b> per run. Cheap. Now hold that number - the next stop asks the question that actually matters.'
+    },
+
+    'Segment Yard': {
+      type: 'compute',
+      recall: 'Insights Foundry',
+      q: 'That same 90-credit insight is scheduled hourly rather than daily. What does a single 24-hour period cost?',
+      hint: '90 credits per run',
+      answer: 2160,
+      fb: '90 \u00d7 24 = <b>2,160 credits</b>, against 90 for a daily refresh. Identical answer, 24 times the bill. <b>Refresh frequency, not data volume, is what usually kills a budget.</b>'
+    },
+
+    'Data Graph Depot': {
+      type: 'choice',
+      q: 'An agent needs a customer profile plus their last five orders in under 100ms. What do you reach for?',
+      opts: [
+        'A segment',
+        'A data graph - pre-computed and denormalized, no joins at read time',
+        'A Calculated Insight',
+        'A federated query to the warehouse'
+      ],
+      right: 1,
+      fb: '<b>A data graph.</b> The parcel is already assembled and cached. A federated query would cross the network to someone else\u2019s warehouse and blow the latency budget.'
+    },
+
+    'Vector Wing': {
+      type: 'choice',
+      recall: 'Unified Individual',
+      q: 'Why ground an agent on Data 360\u2019s index instead of a standalone vector database?',
+      opts: [
+        'It is cheaper per query',
+        'Retrieval is tied to a resolved profile, carrying entitlements and consent',
+        'Standalone vector databases cannot store PDFs',
+        'It returns more results per query'
+      ],
+      right: 1,
+      fb: '<b>Identity.</b> A standalone store retrieves text but has no idea whose text it is, or whether this customer ever agreed you could use it.'
+    },
+
+    'Query API Dock': {
+      type: 'order',
+      recall: 'Match Plaza',
+      q: 'Identity resolution, start to finish. Click the four steps in the order they actually happen.',
+      items: [
+        'Reconciliation rules choose the winning value',
+        'Match rules evaluate candidate records',
+        'The unified profile surfaces one value per field',
+        'Records link to a unified profile'
+      ],
+      answer: [1, 3, 0, 2],
+      fb: '<b>Match, link, reconcile, surface.</b> Linking and choosing are separate stages - which is exactly why a loose match rule corrupts the profile long before reconciliation ever gets a say.'
+    }
+  };
+
+  STOPS.forEach(function (s) {
+    if (!s.quiz && PUZZLES[s.name]) s.quiz = PUZZLES[s.name];
+    if (s.quiz && !s.quiz.type) s.quiz.type = 'choice';
+  });
+
   // Route waypoints: travel in x along a row, then step in y between rows.
   var ROUTE = [];
   for (var i = 0; i < STOPS.length; i++) {
@@ -649,7 +902,10 @@
     charged: {},     // stop idx -> true
     zeroCopy: false,
     quizOpen: false,
-    seen: {}
+    seen: {},
+    score: 0,
+    answeredHere: false,
+    pendingIntro: true
   };
 
   var DWELL = 3.2;
@@ -734,17 +990,28 @@
   var qzG = document.getElementById('quizgo');
   var wasPlaying = false;
 
-  function openQuiz(q) {
-    wasPlaying = st.playing;
-    st.playing = false;
-    setPlayLabel();
-    st.quizOpen = true;
-    qzQ.textContent = q.q;
-    qzO.innerHTML = '';
-    qzF.className = '';
-    qzF.innerHTML = '';
-    qzG.className = '';
+  var qzK = document.getElementById('quizkind');
+  var elScore = document.getElementById('g-score');
+  var TOTAL_PUZZLES = STOPS.filter(function (s) { return !!s.quiz; }).length;
 
+  function paintScore() {
+    elScore.textContent = st.score + ' / ' + TOTAL_PUZZLES;
+    elScore.className = 'v' + (st.score > 0 ? ' cool' : '');
+  }
+
+  function settle(q, correct) {
+    if (!st.answeredHere) {
+      st.answeredHere = true;
+      if (correct) st.score++;
+      paintScore();
+    }
+    qzF.innerHTML = (correct ? '' : 'Not quite. ') + q.fb;
+    qzF.className = 'show';
+    qzG.className = 'show';
+    qzG.focus();
+  }
+
+  function buildChoice(q) {
     q.opts.forEach(function (text, i) {
       var b = document.createElement('button');
       b.className = 'opt';
@@ -756,16 +1023,139 @@
           if (j === q.right) n.classList.add('right');
           else if (j === i) n.classList.add('wrong');
         });
-        qzF.innerHTML = q.fb;
-        qzF.className = 'show';
-        qzG.className = 'show';
-        qzG.focus();
+        settle(q, i === q.right);
       });
       qzO.appendChild(b);
     });
+  }
+
+  function buildOrder(q) {
+    var seq = document.createElement('div');
+    seq.className = 'seq';
+    var ph = document.createElement('span');
+    ph.className = 'ph';
+    ph.textContent = 'click them in order';
+    seq.appendChild(ph);
+
+    var placed = 0;
+    var btns = [];
+
+    function revealAll() {
+      q.answer.forEach(function (itemIdx, pos) {
+        var n = btns[itemIdx];
+        n.disabled = true;
+        if (!n.querySelector('.pos')) {
+          var tag = document.createElement('span');
+          tag.className = 'pos';
+          tag.textContent = String(pos + 1);
+          n.insertBefore(tag, n.firstChild);
+        }
+      });
+      btns.forEach(function (n) { n.disabled = true; });
+    }
+
+    q.items.forEach(function (text, i) {
+      var b = document.createElement('button');
+      b.className = 'opt';
+      b.type = 'button';
+      b.textContent = text;
+      b.addEventListener('click', function () {
+        if (b.disabled) return;
+        if (q.answer[placed] === i) {
+          placed++;
+          b.disabled = true;
+          b.classList.add('right');
+          var tag = document.createElement('span');
+          tag.className = 'pos';
+          tag.textContent = String(placed);
+          b.insertBefore(tag, b.firstChild);
+          if (ph.parentNode) seq.removeChild(ph);
+          var tok = document.createElement('span');
+          tok.className = 'tok';
+          tok.textContent = placed + '. ' + text;
+          seq.appendChild(tok);
+          if (placed === q.answer.length) settle(q, true);
+        } else {
+          b.classList.add('wrong');
+          revealAll();
+          settle(q, false);
+        }
+      });
+      btns.push(b);
+      qzO.appendChild(b);
+    });
+
+    qzO.appendChild(seq);
+  }
+
+  function buildCompute(q) {
+    if (q.hint) {
+      var h = document.createElement('div');
+      h.className = 'formula';
+      h.textContent = q.hint;
+      qzO.appendChild(h);
+    }
+
+    var row = document.createElement('div');
+    row.className = 'calc';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    input.placeholder = 'credits';
+    input.setAttribute('aria-label', 'Your answer in credits');
+
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.textContent = 'Check';
+
+    function check() {
+      if (input.disabled) return;
+      var raw = input.value.replace(/[,\s_]/g, '');
+      var val = parseFloat(raw);
+      var ok = isFinite(val) && Math.abs(val - q.answer) < 0.5;
+      input.disabled = true;
+      go.disabled = true;
+      input.classList.add(ok ? 'right' : 'wrong');
+      if (!ok) input.value = raw === '' ? '' : input.value;
+      settle(q, ok);
+    }
+
+    go.addEventListener('click', check);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); check(); }
+    });
+
+    row.appendChild(input);
+    row.appendChild(go);
+    qzO.appendChild(row);
+  }
+
+  function openQuiz(q) {
+    wasPlaying = st.playing;
+    st.playing = false;
+    setPlayLabel();
+    st.quizOpen = true;
+    st.answeredHere = false;
+
+    qzQ.textContent = q.q;
+    qzO.innerHTML = '';
+    qzF.className = '';
+    qzF.innerHTML = '';
+    qzG.className = '';
+
+    qzK.textContent = q.recall ? ('Recall \u00b7 ' + q.recall)
+      : q.type === 'compute' ? 'Do the maths'
+      : q.type === 'order' ? 'Sequence'
+      : 'Checkpoint';
+
+    if (q.type === 'order') buildOrder(q);
+    else if (q.type === 'compute') buildCompute(q);
+    else buildChoice(q);
 
     qz.classList.add('show');
-    var first = qzO.querySelector('.opt');
+    var first = qzO.querySelector('.opt, input');
     if (first) first.focus();
   }
 
@@ -782,32 +1172,57 @@
   }
 
   function nextStop() {
-    // advance route to the next waypoint that is a stop
+    // Advance to the next waypoint that is a stop, halting at the end of the
+    // route. The old modulo wrapped short of the final index, so the last stop
+    // was reachable by autoplay but never by the Step button.
     var guard = 0;
-    do {
-      st.seg = (st.seg + 1) % (ROUTE.length - 1);
+    while (st.seg < ROUTE.length - 1 && guard < 60) {
+      st.seg++;
       guard++;
-    } while (ROUTE[st.seg].stop < 0 && guard < 60);
+      if (ROUTE[st.seg].stop >= 0) break;
+    }
     st.t = 0;
     st.dwell = DWELL;
     if (ROUTE[st.seg].stop >= 0) arriveAt(ROUTE[st.seg].stop);
   }
 
   function reset() {
+    // Restarting with a challenge on screen used to leave the modal up,
+    // desynced from a tour that had already gone back to stop 1.
+    qz.classList.remove('show');
+    st.quizOpen = false;
+    wasPlaying = false;
+    st.playing = false;
+    setPlayLabel();
+
     st.seg = 0; st.t = 0; st.dwell = DWELL; st.credits = 0;
     st.charged = {}; st.seen = {}; st.current = 0;
+    st.score = 0; st.pendingIntro = true;
+    // The opening question is gated behind the first Play, so the park is on
+    // screen before a modal covers it.
+    st.seen[0] = true;
+    paintScore();
     arriveAt(0);
     centreOn(STOPS[0], true);
+  }
+
+  // Returns true if it consumed the interaction by opening the opening question.
+  function introGate() {
+    if (!st.pendingIntro) return false;
+    st.pendingIntro = false;
+    st.playing = true;              // so answering it starts the tour
+    openQuiz(STOPS[0].quiz);
+    return true;
   }
 
   // Both are no-ops while a checkpoint is open, or the tour advances behind
   // the modal and the panel stops matching the question on screen.
   document.getElementById('b-play').addEventListener('click', function () {
-    if (st.quizOpen) return;
+    if (st.quizOpen || introGate()) return;
     st.playing = !st.playing; setPlayLabel();
   });
   document.getElementById('b-step').addEventListener('click', function () {
-    if (st.quizOpen) return;
+    if (st.quizOpen || introGate()) return;
     nextStop();
   });
   document.getElementById('b-reset').addEventListener('click', reset);
@@ -846,8 +1261,9 @@
   document.addEventListener('keydown', function (e) {
     if (st.quizOpen) { if (e.key === 'Escape') qzG.click(); return; }
     var k = e.key.toLowerCase();
-    if (e.code === 'Space') { e.preventDefault(); st.playing = !st.playing; setPlayLabel(); }
-    else if (k === 's') { e.preventDefault(); nextStop(); }
+    // Route through the buttons so the keys honour the intro gate too.
+    if (e.code === 'Space') { e.preventDefault(); el.play.click(); }
+    else if (k === 's') { e.preventDefault(); document.getElementById('b-step').click(); }
     else if (k === 'r') { reset(); }
     else if (k === 'f') { bFollow.click(); }
     else if (k === 'l') { bLabels.click(); }
@@ -1115,10 +1531,11 @@
   paintPanel();
   requestAnimationFrame(frame);
 
-  // autoplay after a beat so the first panel is readable
+  // After a beat to take in the park, the opening question appears; answering
+  // it starts the tour.
   setTimeout(function () {
-    if (!st.quizOpen) { st.playing = true; setPlayLabel(); }
-  }, 2600);
+    if (!st.quizOpen) introGate();
+  }, 2800);
 
 })();
 </script>

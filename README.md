@@ -51,7 +51,21 @@ stated as a hard rule and was simply wrong. A simulation makes facts stick; it m
 - **Ingest ⟷ Zero-Copy toggle** — flip it and the warehouse convoy stops physically
   travelling. A federated query beam fires instead and the meter recomputes.
 
-Three checkpoint questions fire at Category Gate, Unified Individual and Activation Gates.
+## Challenges
+
+Every one of the 15 stops has a challenge, and the HUD keeps score. Three kinds:
+
+| Kind | What it asks |
+|---|---|
+| **Checkpoint** | An applied decision — batch or streaming, where to filter, which tool for a 100ms read |
+| **Sequence** | Click stages in the order they actually happen |
+| **Do the maths** | Work `credits = (d ÷ u) × m` by hand and type the answer |
+
+Seven of them are **recall** challenges, tagged with the earlier stop they reach back to —
+answering about a *previous* step is what makes it stick, which is the whole reason the method
+recommends them. Two of them chain: the Insights Foundry has you compute 90 credits for one
+run, then the Segment Yard asks what the same insight costs refreshed hourly. Arriving at
+2,160 yourself lands harder than reading that refresh frequency matters.
 
 ## Controls
 
