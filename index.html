@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An interactive low-poly simulation of Salesforce Data 360: follow records from source to activation.">
+<meta name="color-scheme" content="dark light">
+<title>Data 360 Tycoon</title>
+</head>
+<body>
+<style>
+  :root {
+    --sky-1: #1B2432;
+    --sky-2: #2E3B4E;
+    --ground: #141A24;
+    --panel: rgba(20, 26, 36, 0.92);
+    --panel-edge: #38455A;
+    --ink: #E9EEF4;
+    --ink-soft: #AEB9C7;
+    --muted: #74829A;
+    --accent: #4FC4B8;
+    --gold: #E3B23C;
+    --violet: #9B7FD4;
+    --coral: #E07A5F;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  #app { position: fixed; inset: 0; }
+
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+
+  /* ---------- top bar ---------- */
+
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+    background: var(--panel-edge);
+    border-bottom: 1px solid var(--panel-edge);
+    backdrop-filter: blur(8px);
+    flex-wrap: wrap;
+  }
+
+  .gauge {
+    background: var(--panel);
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .gauge .k {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .gauge .v {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .gauge .v.hot { color: var(--gold); }
+  .gauge .v.cool { color: var(--accent); }
+  .gauge .v small { color: var(--muted); font-size: 11px; }
+
+  #title {
+    background: var(--panel);
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 0 0 auto;
+  }
+  #title b { font-size: 14px; letter-spacing: 0.01em; }
+  #title span { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); }
+
+  /* zero-copy switch */
+
+  #zc {
+    background: var(--panel);
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  .switch {
+    display: inline-flex;
+    border: 1px solid var(--panel-edge);
+    border-radius: 3px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .switch button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 3px 9px;
+    cursor: pointer;
+    font: inherit;
+    text-transform: uppercase;
+  }
+
+  .switch button[aria-pressed="true"] { background: var(--accent); color: #0B1218; }
+  .switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* ---------- info panel ---------- */
+
+  #panel {
+    position: absolute;
+    left: 14px;
+    bottom: 78px;
+    width: min(370px, calc(100vw - 28px));
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 5px;
+    padding: 14px 16px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    backdrop-filter: blur(10px);
+    max-height: min(46vh, 340px);
+    overflow-y: auto;
+  }
+
+  #panel .tagrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+
+  #panel h2 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -0.01em; }
+  #panel p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+  #panel p.term { color: var(--ink); }
+  #panel p.term b { color: var(--accent); }
+
+  .costline {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--panel-edge);
+    padding-top: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .costline b { color: var(--gold); font-weight: 400; }
+
+  /* ---------- controls ---------- */
+
+  #controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-edge);
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    backdrop-filter: blur(8px);
+  }
+
+  #controls button.btn {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-soft);
+    border-radius: 3px;
+    padding: 6px 11px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  #controls button.btn:hover { border-color: var(--accent); color: var(--accent); }
+  #controls button.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #controls button.btn.on { border-color: var(--accent); color: var(--accent); }
+  #controls button.btn.primary { border-color: var(--accent); color: var(--accent); min-width: 92px; }
+
+  .speed { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+  .speed label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .speed input { width: 100px; accent-color: var(--accent); }
+
+  #progress {
+    position: absolute;
+    left: 0; right: 0; bottom: 100%;
+    height: 2px;
+    background: var(--panel-edge);
+  }
+  #progress i { display: block; height: 100%; background: var(--accent); width: 0%; transition: width .2s linear; }
+
+  .hint { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+
+  /* ---------- quiz ---------- */
+
+  #quiz {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 20, 0.72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(3px);
+    z-index: 20;
+  }
+  #quiz.show { display: flex; }
+
+  #quizbox {
+    background: var(--panel);
+    border: 1px solid var(--violet);
+    border-radius: 6px;
+    padding: 22px;
+    width: min(430px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+  }
+
+  #quizbox .chip { color: var(--violet); align-self: flex-start; }
+  #quizbox h3 { margin: 0; font-size: 17px; line-height: 1.35; }
+  #quizbox .opts { display: flex; flex-direction: column; gap: 7px; }
+
+  #quizbox .opt {
+    appearance: none;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-soft);
+    border-radius: 4px;
+    padding: 10px 13px;
+    font: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  #quizbox .opt:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+  #quizbox .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #quizbox .opt.right { border-color: var(--accent); color: var(--accent); }
+  #quizbox .opt.wrong { border-color: var(--coral); color: var(--coral); }
+  #quizbox .opt:disabled { cursor: default; }
+
+  #quizfb { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 0; display: none; }
+  #quizfb.show { display: block; }
+  #quizfb b { color: var(--accent); }
+
+  #quizgo {
+    align-self: flex-end;
+    appearance: none;
+    background: var(--accent);
+    border: 0;
+    color: #0B1218;
+    border-radius: 3px;
+    padding: 8px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: none;
+  }
+  #quizgo.show { display: block; }
+
+  @media (max-width: 720px) {
+    #panel { left: 8px; right: 8px; width: auto; bottom: 92px; max-height: 38vh; }
+    .gauge { padding: 6px 10px; }
+    .gauge .v { font-size: 13px; }
+    #title { flex: 1 1 100%; }
+    .speed { margin-left: 0; flex: 1 1 100%; }
+    .hint { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #progress i { transition: none; }
+  }
+</style>
+
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="title">
+      <b>Data 360 Tycoon</b>
+      <span>Follow the record &middot; 15 stops</span>
+    </div>
+    <div class="gauge">
+      <span class="k">Stop</span>
+      <span class="v" id="g-stop">1 / 15</span>
+    </div>
+    <div class="gauge">
+      <span class="k">Profiles in convoy</span>
+      <span class="v" id="g-prof">3 <small>source</small></span>
+    </div>
+    <div class="gauge">
+      <span class="k">Credits burned <span style="text-transform:none">(illustrative)</span></span>
+      <span class="v hot" id="g-cred">0</span>
+    </div>
+    <div id="zc">
+      <span class="k" style="font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Warehouse mode</span>
+      <span class="switch">
+        <button id="zc-ing" aria-pressed="true">Ingest</button>
+        <button id="zc-zero" aria-pressed="false">Zero-Copy</button>
+      </span>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="tagrow">
+      <span class="chip" id="p-district">Sources</span>
+      <span class="chip" id="p-cat" style="color:var(--muted)">Connect</span>
+    </div>
+    <h2 id="p-name">Source Depot</h2>
+    <p id="p-body">Loading&hellip;</p>
+    <p class="term" id="p-term"></p>
+    <div class="costline" id="p-cost"></div>
+  </div>
+
+  <div id="controls">
+    <div id="progress"><i id="progbar"></i></div>
+    <button class="btn primary" id="b-play">&#9654; Play</button>
+    <button class="btn" id="b-step">S &middot; Next stop</button>
+    <button class="btn" id="b-reset">R &middot; Restart</button>
+    <button class="btn on" id="b-follow">F &middot; Follow</button>
+    <button class="btn on" id="b-labels">L &middot; Signs</button>
+    <span class="hint">drag to pan &middot; scroll to zoom &middot; click a building</span>
+    <span class="speed">
+      <label for="sp">Speed</label>
+      <input type="range" id="sp" min="0.25" max="3" step="0.25" value="1">
+      <span class="v" id="sp-v" style="font-family:var(--mono);font-size:11px;color:var(--ink-soft)">1.0&times;</span>
+    </span>
+  </div>
+
+  <div id="quiz" role="dialog" aria-modal="true" aria-labelledby="quizq">
+    <div id="quizbox">
+      <span class="chip">Checkpoint</span>
+      <h3 id="quizq"></h3>
+      <div class="opts" id="quizopts"></div>
+      <p id="quizfb"></p>
+      <button id="quizgo">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- content
+
+  // Multipliers are ILLUSTRATIVE. Salesforce publishes real ones only in the
+  // rate card, and Trailhead's own m=15 example is explicitly labelled
+  // illustrative. The formula credits = (d / u) * m is the documented part,
+  // with u = 1 million for every usage type.
+  var UNIT = 1e6;
+  var RECORDS = 6e6;
+
+  var D = {
+    SRC:  { name: 'Sources',        color: '#5B7C99' },
+    LAKE: { name: 'Ingest & Lake',  color: '#C08A3E' },
+    MODEL:{ name: 'Modeling',       color: '#2E9B92' },
+    ID:   { name: 'Identity',       color: '#9B7FD4' },
+    USE:  { name: 'Consumption',    color: '#3E9E7E' },
+    ACT:  { name: 'Activation',     color: '#E07A5F' }
+  };
+
+  var STOPS = [
+    {
+      d: D.SRC, cat: '\u2014', m: 0, name: 'Source Depots',
+      body: 'Three convoys load up: Sales Cloud CRM, the web & mobile SDK, and a Snowflake warehouse. Each carries records about the same handful of people \u2014 but in three different shapes, with three different ideas of what a "customer" looks like.',
+      term: 'Nothing has been charged yet. Data sitting in a source system costs you nothing in Data 360.',
+      payload: 'ragged'
+    },
+    {
+      d: D.SRC, cat: 'Connect', m: 2000, name: 'Data Stream',
+      body: 'A data stream is the configured pipe from a source. Batch or streaming \u2014 and streaming consumes more credits than batch for equivalent work, which is documented, unlike most rates you will read.',
+      term: '<b>DSO</b> \u2014 Data Source Object \u2014 is the source-side schema as the connector sees it. You rarely edit it.',
+      payload: 'ragged'
+    },
+    {
+      d: D.LAKE, cat: 'Connect', m: 0, name: 'DLO Yard',
+      body: 'The crates land exactly as they arrived: original field names, original formats, original mess. Nothing has been cleaned, renamed or reshaped. This is the staging layer, and it is deliberately faithful to the source.',
+      term: '<b>DLO</b> \u2014 Data Lake Object \u2014 raw storage of what was actually ingested. Preserved so you can always go back and check.',
+      payload: 'ragged'
+    },
+    {
+      d: D.LAKE, cat: 'Harmonize & Unify', m: 400, name: 'Transform Works',
+      body: 'Cleanup before modelling: formula fields, type fixes, filtering out the rows you will never activate. Every row you carry past this point costs money at every later stop \u2014 so this is the cheapest place to drop dead weight.',
+      term: 'Ingesting data you never activate is storage plus ingest for zero return. Ingest against a named use case.',
+      payload: 'ragged'
+    },
+    {
+      d: D.MODEL, cat: 'Harmonize & Unify', m: 400, name: 'Mapping Hall',
+      body: 'The crates are reshaped into one canonical form. Five systems that each describe a person all map into the same Individual object; five that describe a company map into Account. This mapping is the core ongoing design work of the platform \u2014 not a one-time setup task.',
+      term: '<b>DMO</b> \u2014 Data Model Object \u2014 the harmonized view, conforming to the Customer 360 Data Model. Salesforce ships <b>89 standard DMOs</b>.',
+      payload: 'canonical'
+    },
+    {
+      d: D.MODEL, cat: '\u2014', m: 0, name: 'Category Gate',
+      body: 'Every DMO is stamped Profile, Engagement or Other, and the stamp decides what it can do later. Profile and Other must have a primary key mapped or the mapping simply will not save. Engagement must carry an event timestamp, because engagement data is time-based by nature.',
+      term: 'Get this wrong and you remap. An <b>Engagement</b> DLO cannot be mapped to a <b>Profile</b> DMO \u2014 Salesforce hides incompatible objects from the selector.',
+      payload: 'canonical',
+      quiz: {
+        q: 'Your ruleset needs to match people. Which category of stream can feed identity resolution?',
+        opts: ['Engagement only', 'Profile or Other', 'Any category', 'Other only'],
+        right: 1,
+        fb: '<b>Profile or Other.</b> Engagement DLOs cannot map to Profile DMOs at all. This is the correction that most secondary blog posts get wrong \u2014 including, until it was checked against source, our own primer.'
+      }
+    },
+    {
+      d: D.ID, cat: 'Harmonize & Unify', m: 5000, name: 'Match Plaza',
+      body: 'The three convoys converge. Match rules ask: are these the same person? Each rule pairs a field with a method \u2014 exact, fuzzy, or normalized. Logic is AND within a rule, OR across rules: "fuzzy first name AND exact normalized address" OR "fuzzy first name AND exact party identifier".',
+      term: 'Start <b>narrow</b> \u2014 exact email, exact phone \u2014 then loosen. A broad fuzzy name-and-city rule collapses distinct humans into one profile, and marketing will find out for you.',
+      payload: 'canonical'
+    },
+    {
+      d: D.ID, cat: 'Harmonize & Unify', m: 5000, name: 'Reconciliation Tower',
+      body: 'The records matched \u2014 but they disagree. Two email addresses, three spellings of a surname. Reconciliation rules decide which value surfaces: Most Recent, Most Frequent, Source Priority. The values that lose are not thrown away.',
+      term: 'Profile unification carries the <b>highest rate multiplier of any usage type</b>. Watch the meter. This is the single fact that should drive your architecture.',
+      payload: 'canonical'
+    },
+    {
+      d: D.ID, cat: '\u2014', m: 0, name: 'Unified Individual',
+      body: 'One golden cart leaves the plaza \u2014 but look at the tethers running back to the yard. The source records still exist, untouched, still traceable. Identity resolution built a linkage layer on top of them; it did not merge, overwrite or delete anything.',
+      term: 'Limits worth designing around: <b>max two rulesets per DMO</b>, and unified profiles appear <b>within 24 hours</b> of first publishing. Not an instant feedback loop.',
+      payload: 'unified',
+      quiz: {
+        q: 'Identity resolution has run. What happened to the three original source records?',
+        opts: [
+          'Merged into one and the originals deleted',
+          'Overwritten with the reconciled values',
+          'Untouched \u2014 linked to a unified profile',
+          'Archived to cold storage'
+        ],
+        right: 2,
+        fb: '<b>Untouched.</b> Data 360 never deletes or overwrites source data. It builds a linkage layer, so a unified profile always traces back \u2014 and you can change a ruleset and re-run it.'
+      }
+    },
+    {
+      d: D.USE, cat: 'Analyze & Predict', m: 15, name: 'Insights Foundry',
+      body: 'Calculated Insights are SQL-defined metrics over DMOs: lifetime value, RFM scores, propensity inputs. Cheap per run \u2014 and that is the trap. They are recomputed and billed on every refresh.',
+      term: 'An insight scheduled hourly that could run daily costs <b>24\u00d7</b> for the same answer. Refresh frequency, not data volume, is usually what kills the budget.',
+      payload: 'unified'
+    },
+    {
+      d: D.USE, cat: 'Segment & Activate', m: 20, name: 'Segment Yard',
+      body: 'Filter gates build audiences from profile plus engagement data. Note what is billed: rows <em>processed</em>, not rows returned. A segment that scans the full profile base every run costs the same whether it returns ten people or ten million.',
+      term: 'Gate expensive runs behind a Data 360-triggered Flow or a cheap insight, so they only fire when the underlying data actually changed.',
+      payload: 'unified'
+    },
+    {
+      d: D.USE, cat: 'Act', m: 30, name: 'Data Graph Depot',
+      body: 'A data graph is a pre-computed, denormalized parcel: the profile and everything related to it, cached as JSON. No joins at read time. This is what you reach for when something needs an answer in milliseconds.',
+      term: 'The right tool for real-time personalization and agent grounding.',
+      payload: 'unified'
+    },
+    {
+      d: D.USE, cat: 'Act', m: 30, name: 'Vector Wing',
+      body: 'The side spur handles unstructured content \u2014 PDFs, call transcripts, SharePoint and Drive documents. Chunked, embedded, and shelved into keyword, vector and hybrid indexes. Hyper can then run one ensemble query across structured tables and both index types at once.',
+      term: 'Why not just bolt on a vector database? <b>Identity.</b> A standalone store retrieves text but has no idea whose it is, or whether you are allowed to use it.',
+      payload: 'unified'
+    },
+    {
+      d: D.USE, cat: 'Act', m: 30, name: 'Query API Dock',
+      body: 'ANSI-flavoured SQL over DMOs via REST, backed by Hyper. This is how external systems read Data 360 without anyone building an ETL job \u2014 and where the platform stops being a walled garden.',
+      term: 'Reporting workloads still belong in the warehouse. Data 360 is an activation layer, not a BI warehouse.',
+      payload: 'unified'
+    },
+    {
+      d: D.ACT, cat: 'Segment & Activate', m: 10, name: 'Activation Gates',
+      body: 'The parcel departs for Agentforce, Marketing Cloud, ad platforms, Flow and Tableau. This is the only stop that produces business value. Everything upstream was cost \u2014 which is the argument for never ingesting a record you cannot name a destination for.',
+      term: 'Data 360\u2019s job in 2026 is grounding <b>Agentforce</b> in resolved, consented customer context.',
+      payload: 'unified',
+      quiz: {
+        q: 'Which single lever most reliably cuts a Data 360 bill?',
+        opts: [
+          'Compressing stored data',
+          'Reducing refresh frequency of insights and segments',
+          'Using fewer activation targets',
+          'Switching to a smaller org'
+        ],
+        right: 1,
+        fb: '<b>Refresh frequency.</b> Credits = (d \u00f7 u) \u00d7 m is charged on every run. The same insight hourly instead of daily is 24\u00d7 the bill for an identical answer.'
+      }
+    }
+  ];
+
+  // -------------------------------------------------------------- geometry
+
+  var COLS = 5, SPAN = 5.9;
+
+  function gridOf(i) {
+    var row = Math.floor(i / COLS);
+    var col = (row % 2 === 0) ? (i % COLS) : (COLS - 1 - (i % COLS));
+    return { x: col * SPAN, y: row * SPAN };
+  }
+
+  STOPS.forEach(function (s, i) {
+    var g = gridOf(i);
+    s.gx = g.x; s.gy = g.y; s.idx = i;
+  });
+
+  // Route waypoints: travel in x along a row, then step in y between rows.
+  var ROUTE = [];
+  for (var i = 0; i < STOPS.length; i++) {
+    var a = STOPS[i];
+    ROUTE.push({ x: a.gx, y: a.gy, stop: i });
+    var b = STOPS[i + 1];
+    if (b) {
+      if (b.gy !== a.gy) ROUTE.push({ x: a.gx, y: b.gy, stop: -1 });
+    }
+  }
+
+  // ---------------------------------------------------------------- canvas
+
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0;
+
+  function resize() {
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.floor(W * DPR);
+    cv.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  var TW = 34, TH = 17, ZH = 21;
+
+  var cam = { x: 0, y: 0, zoom: 1, tx: 0, ty: 0, tzoom: 1 };
+
+  function iso(x, y, z) {
+    return {
+      sx: (x - y) * TW * cam.zoom + cam.x,
+      sy: (x + y) * TH * cam.zoom - (z || 0) * ZH * cam.zoom + cam.y
+    };
+  }
+
+  // Must return hex: box() shades its faces from whatever colour it is given,
+  // so shade(shade(c)) has to round-trip. Returning rgb() here made the second
+  // parse NaN and painted every roof detail black.
+  function shade(hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * f)));
+    var g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * f)));
+    var b = Math.max(0, Math.min(255, Math.round((n & 255) * f)));
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+  }
+
+  // z0 = base height, h = extrusion. Without a base the roof details extrude
+  // from the ground and punch through the roof as dark notches.
+  function box(x, y, w, d, z0, h, color, outline) {
+    var tp = z0 + h;
+    var t0 = iso(x, y, tp), t1 = iso(x + w, y, tp), t2 = iso(x + w, y + d, tp), t3 = iso(x, y + d, tp);
+    var b0 = iso(x, y, z0), b3 = iso(x, y + d, z0), b2 = iso(x + w, y + d, z0);
+
+    // left face
+    ctx.fillStyle = shade(color, 0.62);
+    ctx.beginPath();
+    ctx.moveTo(t0.sx, t0.sy); ctx.lineTo(t3.sx, t3.sy);
+    ctx.lineTo(b3.sx, b3.sy); ctx.lineTo(b0.sx, b0.sy);
+    ctx.closePath(); ctx.fill();
+
+    // right face
+    ctx.fillStyle = shade(color, 0.44);
+    ctx.beginPath();
+    ctx.moveTo(t3.sx, t3.sy); ctx.lineTo(t2.sx, t2.sy);
+    ctx.lineTo(b2.sx, b2.sy); ctx.lineTo(b3.sx, b3.sy);
+    ctx.closePath(); ctx.fill();
+
+    // top face
+    ctx.fillStyle = shade(color, 1.0);
+    ctx.beginPath();
+    ctx.moveTo(t0.sx, t0.sy); ctx.lineTo(t1.sx, t1.sy);
+    ctx.lineTo(t2.sx, t2.sy); ctx.lineTo(t3.sx, t3.sy);
+    ctx.closePath(); ctx.fill();
+
+    if (outline) {
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
+
+  function pad(x, y, w, d, color, a) {
+    var p0 = iso(x, y, 0), p1 = iso(x + w, y, 0), p2 = iso(x + w, y + d, 0), p3 = iso(x, y + d, 0);
+    ctx.globalAlpha = a === undefined ? 1 : a;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(p0.sx, p0.sy); ctx.lineTo(p1.sx, p1.sy);
+    ctx.lineTo(p2.sx, p2.sy); ctx.lineTo(p3.sx, p3.sy);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ------------------------------------------------------------------ state
+
+  var st = {
+    seg: 0,          // index into ROUTE
+    t: 0,            // 0..1 along current segment
+    dwell: 0,        // seconds parked at a stop
+    playing: false,
+    speed: 1,
+    follow: true,
+    labels: true,
+    current: 0,      // current stop index
+    credits: 0,
+    charged: {},     // stop idx -> true
+    zeroCopy: false,
+    quizOpen: false,
+    seen: {}
+  };
+
+  var DWELL = 3.2;
+
+  // ------------------------------------------------------------------ HUD
+
+  var el = {
+    stop: document.getElementById('g-stop'),
+    prof: document.getElementById('g-prof'),
+    cred: document.getElementById('g-cred'),
+    dist: document.getElementById('p-district'),
+    cat: document.getElementById('p-cat'),
+    name: document.getElementById('p-name'),
+    body: document.getElementById('p-body'),
+    term: document.getElementById('p-term'),
+    cost: document.getElementById('p-cost'),
+    prog: document.getElementById('progbar'),
+    play: document.getElementById('b-play')
+  };
+
+  function multiplierFor(s) {
+    // The Zero-Copy lever: federation replaces the batch pipeline at the
+    // Data Stream stop, and costs dramatically less per million records.
+    if (s.name === 'Data Stream' && st.zeroCopy) return 70;
+    return s.m;
+  }
+
+  function fmt(n) {
+    return n >= 1000 ? Math.round(n).toLocaleString('en-US') : (Math.round(n * 10) / 10).toString();
+  }
+
+  function paintPanel() {
+    var s = STOPS[st.current];
+    var m = multiplierFor(s);
+    el.dist.textContent = s.d.name;
+    el.dist.style.color = s.d.color;
+    el.cat.textContent = s.cat;
+    el.name.textContent = s.name;
+    el.body.innerHTML = s.body;
+    el.term.innerHTML = s.term || '';
+    el.term.style.display = s.term ? '' : 'none';
+
+    if (m > 0) {
+      var c = (RECORDS / UNIT) * m;
+      el.cost.innerHTML = 'credits = (' + fmt(RECORDS) + ' \u00f7 1,000,000) \u00d7 ' + m +
+        ' = <b>' + fmt(c) + '</b>' +
+        (s.name === 'Data Stream' && st.zeroCopy ? '  \u2190 federated' : '');
+    } else {
+      el.cost.innerHTML = 'No billable usage at this stop.';
+    }
+
+    el.stop.textContent = (st.current + 1) + ' / ' + STOPS.length;
+    var unified = st.current >= 8;
+    el.prof.innerHTML = unified ? '1 <small>unified</small>' : '3 <small>source</small>';
+    el.prof.className = 'v ' + (unified ? 'cool' : '');
+    el.cred.textContent = fmt(st.credits);
+    el.prog.style.width = ((st.current) / (STOPS.length - 1) * 100) + '%';
+  }
+
+  function charge(i) {
+    if (st.charged[i]) return;
+    st.charged[i] = true;
+    var s = STOPS[i];
+    var m = multiplierFor(s);
+    if (m > 0) st.credits += (RECORDS / UNIT) * m;
+  }
+
+  function arriveAt(i) {
+    st.current = i;
+    charge(i);
+    paintPanel();
+    var s = STOPS[i];
+    if (s.quiz && !st.seen[i]) { st.seen[i] = true; openQuiz(s.quiz); }
+  }
+
+  // ------------------------------------------------------------------ quiz
+
+  var qz = document.getElementById('quiz');
+  var qzQ = document.getElementById('quizq');
+  var qzO = document.getElementById('quizopts');
+  var qzF = document.getElementById('quizfb');
+  var qzG = document.getElementById('quizgo');
+  var wasPlaying = false;
+
+  function openQuiz(q) {
+    wasPlaying = st.playing;
+    st.playing = false;
+    setPlayLabel();
+    st.quizOpen = true;
+    qzQ.textContent = q.q;
+    qzO.innerHTML = '';
+    qzF.className = '';
+    qzF.innerHTML = '';
+    qzG.className = '';
+
+    q.opts.forEach(function (text, i) {
+      var b = document.createElement('button');
+      b.className = 'opt';
+      b.type = 'button';
+      b.textContent = text;
+      b.addEventListener('click', function () {
+        Array.prototype.forEach.call(qzO.children, function (n, j) {
+          n.disabled = true;
+          if (j === q.right) n.classList.add('right');
+          else if (j === i) n.classList.add('wrong');
+        });
+        qzF.innerHTML = q.fb;
+        qzF.className = 'show';
+        qzG.className = 'show';
+        qzG.focus();
+      });
+      qzO.appendChild(b);
+    });
+
+    qz.classList.add('show');
+    var first = qzO.querySelector('.opt');
+    if (first) first.focus();
+  }
+
+  qzG.addEventListener('click', function () {
+    qz.classList.remove('show');
+    st.quizOpen = false;
+    if (wasPlaying) { st.playing = true; setPlayLabel(); }
+  });
+
+  // -------------------------------------------------------------- controls
+
+  function setPlayLabel() {
+    el.play.textContent = st.playing ? '\u275a\u275a Pause' : '\u25b6 Play';
+  }
+
+  function nextStop() {
+    // advance route to the next waypoint that is a stop
+    var guard = 0;
+    do {
+      st.seg = (st.seg + 1) % (ROUTE.length - 1);
+      guard++;
+    } while (ROUTE[st.seg].stop < 0 && guard < 60);
+    st.t = 0;
+    st.dwell = DWELL;
+    if (ROUTE[st.seg].stop >= 0) arriveAt(ROUTE[st.seg].stop);
+  }
+
+  function reset() {
+    st.seg = 0; st.t = 0; st.dwell = DWELL; st.credits = 0;
+    st.charged = {}; st.seen = {}; st.current = 0;
+    arriveAt(0);
+    centreOn(STOPS[0], true);
+  }
+
+  // Both are no-ops while a checkpoint is open, or the tour advances behind
+  // the modal and the panel stops matching the question on screen.
+  document.getElementById('b-play').addEventListener('click', function () {
+    if (st.quizOpen) return;
+    st.playing = !st.playing; setPlayLabel();
+  });
+  document.getElementById('b-step').addEventListener('click', function () {
+    if (st.quizOpen) return;
+    nextStop();
+  });
+  document.getElementById('b-reset').addEventListener('click', reset);
+
+  var bFollow = document.getElementById('b-follow');
+  bFollow.addEventListener('click', function () {
+    st.follow = !st.follow; bFollow.classList.toggle('on', st.follow);
+  });
+
+  var bLabels = document.getElementById('b-labels');
+  bLabels.addEventListener('click', function () {
+    st.labels = !st.labels; bLabels.classList.toggle('on', st.labels);
+  });
+
+  var sp = document.getElementById('sp'), spv = document.getElementById('sp-v');
+  sp.addEventListener('input', function () {
+    st.speed = parseFloat(sp.value);
+    spv.textContent = st.speed.toFixed(1) + '\u00d7';
+  });
+
+  var zcIng = document.getElementById('zc-ing'), zcZero = document.getElementById('zc-zero');
+  function setZC(on) {
+    st.zeroCopy = on;
+    zcIng.setAttribute('aria-pressed', String(!on));
+    zcZero.setAttribute('aria-pressed', String(on));
+    // recompute from scratch so the meter honestly reflects the new mode
+    st.credits = 0;
+    var upto = st.current;
+    var keep = st.charged; st.charged = {};
+    for (var i = 0; i <= upto; i++) { if (keep[i]) charge(i); }
+    paintPanel();
+  }
+  zcIng.addEventListener('click', function () { setZC(false); });
+  zcZero.addEventListener('click', function () { setZC(true); });
+
+  document.addEventListener('keydown', function (e) {
+    if (st.quizOpen) { if (e.key === 'Escape') qzG.click(); return; }
+    var k = e.key.toLowerCase();
+    if (e.code === 'Space') { e.preventDefault(); st.playing = !st.playing; setPlayLabel(); }
+    else if (k === 's') { e.preventDefault(); nextStop(); }
+    else if (k === 'r') { reset(); }
+    else if (k === 'f') { bFollow.click(); }
+    else if (k === 'l') { bLabels.click(); }
+  });
+
+  // pan / zoom
+  var drag = null;
+  cv.addEventListener('pointerdown', function (e) {
+    drag = { x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty, moved: false };
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add('dragging');
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; st.follow = false; bFollow.classList.remove('on'); }
+    cam.tx = drag.cx + dx; cam.ty = drag.cy + dy;
+  });
+  cv.addEventListener('pointerup', function (e) {
+    cv.classList.remove('dragging');
+    if (drag && !drag.moved) pick(e.clientX, e.clientY);
+    drag = null;
+  });
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    cam.tzoom = Math.max(0.45, Math.min(2.2, cam.tzoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+  }, { passive: false });
+  cv.addEventListener('dblclick', function () {
+    st.follow = false; bFollow.classList.remove('on');
+    cam.tzoom = 0.52;
+    var mid = { gx: SPAN * 2, gy: SPAN * 1 };
+    cam.tx = W / 2 - (mid.gx - mid.gy) * TW * cam.tzoom;
+    cam.ty = H / 2 - (mid.gx + mid.gy) * TH * cam.tzoom;
+  });
+
+  function pick(px, py) {
+    var best = -1, bd = 1e9;
+    for (var i = 0; i < STOPS.length; i++) {
+      var p = iso(STOPS[i].gx + 1.4, STOPS[i].gy + 1.4, 1.6);
+      var d = Math.hypot(p.sx - px, p.sy - py);
+      if (d < 52 * cam.zoom && d < bd) { bd = d; best = i; }
+    }
+    if (best >= 0) { st.current = best; paintPanel(); }
+  }
+
+  function centreOn(s, instant) {
+    var wx = (s.gx - s.gy) * TW * cam.tzoom;
+    var wy = (s.gx + s.gy) * TH * cam.tzoom;
+    cam.tx = W / 2 - wx;
+    cam.ty = H * 0.46 - wy;
+    if (instant) { cam.x = cam.tx; cam.y = cam.ty; cam.zoom = cam.tzoom; }
+  }
+
+  // ------------------------------------------------------------------ draw
+
+  function cartPos() {
+    var a = ROUTE[st.seg], b = ROUTE[Math.min(st.seg + 1, ROUTE.length - 1)];
+    var t = st.dwell > 0 ? 0 : st.t;
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+
+  function drawRoad() {
+    for (var i = 0; i < ROUTE.length - 1; i++) {
+      var a = ROUTE[i], b = ROUTE[i + 1];
+      var steps = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) * 2));
+      for (var k = 0; k <= steps; k++) {
+        var t = k / steps;
+        var x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+        pad(x + 1.02, y + 1.02, 0.78, 0.78, '#313E52', 1);
+      }
+    }
+  }
+
+  function drawCrate(x, y, kind, wob) {
+    var lift = 0.40;
+    if (kind === 'ragged') {
+      // three mismatched crates riding together - three different schemas
+      box(x + 0.92, y + 0.92, 0.40, 0.40, lift, 0.34, '#6E93B2');
+      box(x + 1.38, y + 0.98, 0.32, 0.34, lift, 0.24, '#D69B45');
+      box(x + 1.06, y + 1.40, 0.36, 0.30, lift, 0.29, '#8FAF78');
+    } else if (kind === 'canonical') {
+      box(x + 0.96, y + 0.96, 0.38, 0.38, lift, 0.30, '#3ABAAF');
+      box(x + 1.40, y + 0.96, 0.38, 0.38, lift, 0.30, '#3ABAAF');
+      box(x + 0.96, y + 1.40, 0.38, 0.38, lift, 0.30, '#3ABAAF');
+    } else {
+      var g = 0.32 + Math.sin(wob * 2.4) * 0.03;
+      box(x + 1.02, y + 1.02, 0.72, 0.72, lift, g, '#F0C24A', 'rgba(255,236,180,0.85)');
+    }
+  }
+
+  function drawCart(x, y, kind, wob) {
+    // soft ground shadow so the convoy separates from the plot pads
+    var p = iso(x + 1.4, y + 1.4, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.34)';
+    ctx.beginPath();
+    ctx.ellipse(p.sx, p.sy, 30 * cam.zoom, 15 * cam.zoom, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    box(x + 0.80, y + 0.80, 1.20, 1.20, 0, 0.40, '#556781', 'rgba(233,238,244,0.55)');
+    drawCrate(x, y, kind, wob);
+  }
+
+  function label(s, active) {
+    if (!st.labels) return;
+    var p = iso(s.gx + 1.4, s.gy + 1.4, 2.5);
+    var text = (s.idx + 1) + '. ' + s.name;
+    ctx.font = (active ? '600 ' : '') + Math.max(10, 11.5 * cam.zoom) + 'px ' +
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    var w = ctx.measureText(text).width + 14;
+    var h = 19;
+    ctx.globalAlpha = active ? 0.97 : 0.68;
+    ctx.fillStyle = active ? '#0E1620' : '#141A24';
+    ctx.strokeStyle = active ? s.d.color : '#38455A';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(p.sx - w / 2, p.sy - h, w, h, 3);
+    else ctx.rect(p.sx - w / 2, p.sy - h, w, h);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = active ? s.d.color : '#AEB9C7';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, p.sx, p.sy - h / 2);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTether(from, to) {
+    var a = iso(from.gx + 1.4, from.gy + 1.4, 1.1);
+    var b = iso(to.x + 1.4, to.y + 1.4, 1.0);
+    ctx.strokeStyle = 'rgba(155,127,212,0.42)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawBeam(from, to, wob) {
+    var a = iso(from.gx + 1.4, from.gy + 1.4, 1.8);
+    var b = iso(to.x + 1.4, to.y + 1.4, 1.3);
+    var g = ctx.createLinearGradient(a.sx, a.sy, b.sx, b.sy);
+    g.addColorStop(0, 'rgba(79,196,184,0.0)');
+    g.addColorStop(0.5, 'rgba(79,196,184,' + (0.5 + Math.sin(wob * 4) * 0.2).toFixed(2) + ')');
+    g.addColorStop(1, 'rgba(79,196,184,0.0)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+  }
+
+  var t0 = performance.now();
+
+  function frame(now) {
+    var dt = Math.min(0.05, (now - t0) / 1000);
+    t0 = now;
+    var wob = now / 1000;
+
+    // ---- advance
+    if (st.playing && !st.quizOpen) {
+      if (st.dwell > 0) {
+        st.dwell -= dt * st.speed;
+      } else {
+        var a = ROUTE[st.seg], b = ROUTE[Math.min(st.seg + 1, ROUTE.length - 1)];
+        var len = Math.max(0.3, Math.hypot(b.x - a.x, b.y - a.y));
+        st.t += (dt * st.speed * 2.6) / len;
+        if (st.t >= 1) {
+          st.t = 0;
+          st.seg++;
+          if (st.seg >= ROUTE.length - 1) { st.seg = ROUTE.length - 1; st.playing = false; setPlayLabel(); }
+          var wp = ROUTE[st.seg];
+          if (wp && wp.stop >= 0) { st.dwell = DWELL; arriveAt(wp.stop); }
+        }
+      }
+    }
+
+    // ---- camera
+    var cp = cartPos();
+    if (st.follow) {
+      cam.tx = W / 2 - (cp.x - cp.y) * TW * cam.tzoom;
+      cam.ty = H * 0.46 - (cp.x + cp.y) * TH * cam.tzoom;
+    }
+    cam.x += (cam.tx - cam.x) * Math.min(1, dt * 6);
+    cam.y += (cam.ty - cam.y) * Math.min(1, dt * 6);
+    cam.zoom += (cam.tzoom - cam.zoom) * Math.min(1, dt * 6);
+
+    // ---- sky
+    var sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#1B2432');
+    sky.addColorStop(1, '#0F141C');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // ---- ground slab
+    var minX = -2, maxX = SPAN * (COLS - 1) + 4.5;
+    var minY = -2, maxY = SPAN * 2 + 4.5;
+    pad(minX, minY, maxX - minX, maxY - minY, '#18202B', 1);
+
+    drawRoad();
+
+    // ---- buildings, painter's order by (gx+gy)
+    var order = STOPS.slice().sort(function (p, q) { return (p.gx + p.gy) - (q.gx + q.gy); });
+    var cartDrawn = false;
+
+    order.forEach(function (s) {
+      var active = s.idx === st.current;
+      // plot pad
+      pad(s.gx + 0.35, s.gy + 0.35, 2.1, 2.1, active ? shade(s.d.color, 0.34) : '#1E2733', 1);
+
+      // main structure - height carries district identity
+      var h = 1.1 + (s.idx % 3) * 0.28;
+      if (s.d === D.ID) h = 2.0;
+      if (s.d === D.ACT) h = 1.5;
+      box(s.gx + 0.62, s.gy + 0.62, 1.5, 1.5, 0, h, active ? shade(s.d.color, 1.2) : s.d.color);
+
+      // roof detail sits ON the roof, from z0 = h
+      box(s.gx + 1.02, s.gy + 1.02, 0.62, 0.62, h, 0.32, shade(s.d.color, active ? 1.45 : 1.15));
+
+      // Strictly-less, so a convoy parked at a stop draws AFTER that stop's
+      // building instead of being painted over by it.
+      if (!cartDrawn && (cp.x + cp.y) < (s.gx + s.gy) - 0.01) {
+        drawConvoy(cp, wob);
+        cartDrawn = true;
+      }
+    });
+
+    if (!cartDrawn) drawConvoy(cp, wob);
+
+    // ---- tethers: sources are linked, never deleted
+    if (st.current >= 8) {
+      drawTether(STOPS[2], cp);
+      drawTether(STOPS[0], cp);
+    }
+
+    // ---- zero-copy beam: the warehouse never physically travels
+    if (st.zeroCopy && st.current >= 1) drawBeam(STOPS[0], cp, wob);
+
+    order.forEach(function (s) { label(s, s.idx === st.current); });
+
+    requestAnimationFrame(frame);
+  }
+
+  function drawConvoy(cp, wob) {
+    var s = STOPS[st.current];
+    var kind = s.payload;
+    var merged = st.current >= 8;
+
+    if (merged) {
+      drawCart(cp.x, cp.y, 'unified', wob);
+    } else {
+      // three convoys on parallel lanes, converging as they near Match Plaza
+      var conv = st.current >= 6 ? 0.12 : 0.5;
+      var lanes = [-conv, 0, conv];
+      // in Zero-Copy mode the warehouse convoy does not physically travel
+      var skip = st.zeroCopy ? 0 : -1;
+      lanes.forEach(function (o, i) {
+        if (i === skip) return;
+        drawCart(cp.x + o, cp.y - o, kind, wob + i);
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------ boot
+
+  resize();
+  cam.tzoom = 0.95;
+  reset();
+  cam.zoom = cam.tzoom;
+  setPlayLabel();
+  paintPanel();
+  requestAnimationFrame(frame);
+
+  // autoplay after a beat so the first panel is readable
+  setTimeout(function () {
+    if (!st.quizOpen) { st.playing = true; setPlayLabel(); }
+  }, 2600);
+
+})();
+</script>
+</body>
+</html>

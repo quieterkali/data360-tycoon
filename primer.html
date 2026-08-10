@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A working primer on Salesforce Data Cloud, now Data 360.">
+<meta name="color-scheme" content="dark light">
+<title>Data 360 - Working Primer</title>
+</head>
+<body>
+<style>
+  :root {
+    --ground:      #F7F8FA;
+    --surface:     #FFFFFF;
+    --surface-alt: #EFF2F5;
+    --ink:         #1B2027;
+    --ink-soft:    #414B57;
+    --muted:       #6B7480;
+    --rule:        #DBE0E6;
+    --rule-strong: #C3CAD3;
+    --accent:      #0E6B6B;
+    --accent-soft: #E2F0EE;
+    --warn:        #A6701A;
+    --warn-soft:   #F7EEDC;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #14181D;
+      --surface:     #1B2027;
+      --surface-alt: #232931;
+      --ink:         #E7EBEF;
+      --ink-soft:    #C2C9D2;
+      --muted:       #8A94A0;
+      --rule:        #2E353E;
+      --rule-strong: #414B57;
+      --accent:      #4FB3AC;
+      --accent-soft: #17302F;
+      --warn:        #D6A64F;
+      --warn-soft:   #2E2617;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #14181D;
+    --surface:     #1B2027;
+    --surface-alt: #232931;
+    --ink:         #E7EBEF;
+    --ink-soft:    #C2C9D2;
+    --muted:       #8A94A0;
+    --rule:        #2E353E;
+    --rule-strong: #414B57;
+    --accent:      #4FB3AC;
+    --accent-soft: #17302F;
+    --warn:        #D6A64F;
+    --warn-soft:   #2E2617;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0 24px 120px;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+
+  @media (min-width: 1000px) {
+    .shell {
+      grid-template-columns: 210px minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    grid-column: 1 / -1;
+    padding: 80px 0 40px;
+    border-bottom: 1px solid var(--rule-strong);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 5.2vw, 54px);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 20ch;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .standfirst {
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ---------- rail ---------- */
+
+  .rail { display: none; }
+
+  @media (min-width: 1000px) {
+    .rail {
+      display: block;
+      position: sticky;
+      top: 40px;
+      font-size: 13.5px;
+      line-height: 1.45;
+    }
+    .rail ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      border-left: 1px solid var(--rule);
+    }
+    .rail a {
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      color: var(--muted);
+      text-decoration: none;
+      padding-left: 12px;
+      margin-left: -1px;
+      border-left: 2px solid transparent;
+    }
+    .rail a:hover, .rail a:focus-visible {
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+    .rail .n {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--rule-strong);
+      padding-top: 2px;
+    }
+  }
+
+  /* ---------- body ---------- */
+
+  main {
+    min-width: 0;
+    max-width: 72ch;
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+  }
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    scroll-margin-top: 32px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 29px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    align-items: baseline;
+  }
+
+  h2 .n {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 14px 0 0;
+  }
+
+  p { margin: 0; max-width: 68ch; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  strong { font-weight: 650; color: var(--ink); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-alt);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  ul, ol.prose { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 9px; max-width: 68ch; }
+  li { padding-left: 2px; }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 11px 16px 11px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+
+  tbody th {
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  td:last-child, th:last-child { padding-right: 0; }
+
+  table.nums td:last-child,
+  table.nums th:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  /* ---------- pipeline ---------- */
+
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+
+  .stage {
+    flex: 0 0 auto;
+    min-width: 132px;
+    max-width: 168px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 12px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .stage.key {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .stage .lbl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stage.key .lbl { color: var(--accent); }
+
+  .stage .nm { font-size: 14px; font-weight: 650; line-height: 1.3; }
+  .stage .dt { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+  .arrow {
+    flex: 0 0 auto;
+    align-self: center;
+    color: var(--rule-strong);
+    padding: 0 9px;
+    font-size: 15px;
+  }
+
+  .caption {
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 68ch;
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border-left: 2px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 16px;
+  }
+
+  .note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+
+  .note .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .note.warn .tag { color: var(--warn); }
+
+  .flag {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    color: var(--warn);
+    white-space: nowrap;
+  }
+
+  /* ---------- takeaways ---------- */
+
+  .takeaways {
+    counter-reset: t;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  .takeaways li {
+    counter-increment: t;
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 8px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 16.5px;
+    line-height: 1.5;
+  }
+
+  .takeaways li::before {
+    content: counter(t, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    padding-top: 4px;
+  }
+
+  /* ---------- phases ---------- */
+
+  .phase {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 0 4px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .phase-head .t {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .phase-head .h { font-size: 17px; font-weight: 650; }
+  .phase-head .est { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  footer {
+    grid-column: 1 / -1;
+    margin-top: 20px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 68ch;
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">Working primer · compiled 10 Aug 2026</p>
+    <h1>Salesforce Data Cloud is now <em>Data 360</em></h1>
+    <p class="standfirst">Everything that actually matters about the platform: the object model, identity resolution, the zero-copy shift, and the consumption bill that quietly decides your architecture. Verified against Salesforce Architects, Trailhead, and Salesforce Help.</p>
+  </header>
+
+  <nav class="rail" aria-label="Sections">
+    <ol>
+      <li><a href="#s0"><span class="n">00</span><span>The name</span></a></li>
+      <li><a href="#s1"><span class="n">01</span><span>Mental model</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>The pipeline</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Object model</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>Identity resolution</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Consumption</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Zero Copy</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>Vectors &amp; agents</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>The bill</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Misconceptions</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>Learning path</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>The 20%</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="s0">
+      <h2><span class="n">00</span><span>The name</span></h2>
+      <p><strong>Data Cloud was renamed “Data 360” at Dreamforce 2025</strong>, announced 14 October 2025 and folded under the <em>Agentforce 360</em> umbrella. The CDP capabilities did not change with the rebrand. The positioning did — from “customer data platform” to “the live context layer that grounds AI agents.”</p>
+      <p>It is the sixth name for the same lineage. When reading anything written before October 2025, substitute mentally:</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Era</th><th>Name</th></tr></thead>
+          <tbody>
+            <tr><td>~2020</td><td>Customer 360 Audiences</td></tr>
+            <tr><td>~2021</td><td>Salesforce CDP / Marketing Cloud CDP</td></tr>
+            <tr><td>2022</td><td>Salesforce Genie</td></tr>
+            <tr><td>2023–2025</td><td>Salesforce Data Cloud</td></tr>
+            <tr><td>Oct 2025 →</td><td><strong>Data 360</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Practical consequence: docs, URLs, Trailhead badges and the certification are mid-migration. The credential is now the <strong>Salesforce Certified Data 360 Consultant</strong>. Both terms still appear in the product UI, and the API namespace kept its <code>data-cloud</code> paths.</p>
+    </section>
+
+    <section id="s1">
+      <h2><span class="n">01</span><span>One-sentence mental model</span></h2>
+      <div class="note">
+        <span class="tag">Hold on to this</span>
+        <p>Data 360 is a <strong>Hyper-powered lakehouse bolted onto the Salesforce platform</strong> that ingests or federates data from anywhere, maps it into a shared canonical schema, resolves identities into unified profiles, then makes that unified data <em>actionable</em> inside Salesforce — segments, activations, agent grounding, Flow, Tableau.</p>
+      </div>
+      <p>The part people underestimate: <strong>it is not a warehouse you query for reporting.</strong> It is an activation layer. If the goal is BI, the answer is Snowflake, Databricks or BigQuery — and Data 360 can now read those in place rather than copying them (<a href="#s6">§06</a>).</p>
+    </section>
+
+    <section id="s2">
+      <h2><span class="n">02</span><span>End-to-end pipeline</span></h2>
+      <div class="pipeline">
+        <div class="stage">
+          <span class="lbl">Sources</span>
+          <span class="nm">Anywhere</span>
+          <span class="dt">CRM, Marketing Cloud, S3, Snowflake, web/mobile SDK, SharePoint</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage">
+          <span class="lbl">Step 1</span>
+          <span class="nm">Ingest or federate</span>
+          <span class="dt">Data streams, connectors, zero-copy</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage key">
+          <span class="lbl">Step 2</span>
+          <span class="nm">DLO</span>
+          <span class="dt">Raw, exactly as received</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage">
+          <span class="lbl">Step 3</span>
+          <span class="nm">Map &amp; harmonize</span>
+          <span class="dt">The core design work</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage key">
+          <span class="lbl">Step 4</span>
+          <span class="nm">DMO</span>
+          <span class="dt">Canonical C360 schema</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage key">
+          <span class="lbl">Step 5</span>
+          <span class="nm">Identity resolution</span>
+          <span class="dt">Match, then reconcile → Unified Individual</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage">
+          <span class="lbl">Step 6</span>
+          <span class="nm">Consume</span>
+          <span class="dt">Insights, segments, data graphs, Query API, vector search</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="stage">
+          <span class="lbl">Step 7</span>
+          <span class="nm">Activate</span>
+          <span class="dt">Agentforce, Marketing Cloud, ads, Flow, Tableau</span>
+        </div>
+      </div>
+      <p class="caption">Every stage is metered. Keep that in view while designing — see <a href="#s8">§08</a>.</p>
+    </section>
+
+    <section id="s3">
+      <h2><span class="n">03</span><span>The object model</span></h2>
+      <p>Three acronyms carry most of the platform.</p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th></th><th>DSO</th><th>DLO</th><th>DMO</th></tr>
+          </thead>
+          <tbody>
+            <tr><th>Name</th><td>Data Source Object</td><td>Data Lake Object</td><td>Data Model Object</td></tr>
+            <tr><th>What</th><td>Source-side schema as the connector sees it</td><td>Raw storage of what was ingested</td><td>The harmonized, canonical view</td></tr>
+            <tr><th>Shape</th><td>Reflects the origin system</td><td>Preserves original fields, formats, structure</td><td>Conforms to the Customer 360 Data Model</td></tr>
+            <tr><th>Physical?</th><td>No — a definition</td><td>Yes, stored (unless federated)</td><td>Physical <em>or</em> virtual view over DLOs</td></tr>
+            <tr><th>You edit it</th><td>Rarely</td><td>Via transforms and formula fields</td><td>Via <strong>mapping</strong> — the main design work</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Harmonization</h3>
+      <p>Standardizing naming and formats so fields from five different systems that all describe a person land in the same <code>Individual</code> DMO, and five that describe a company land in <code>Account</code>. Salesforce ships <strong>89 standard DMOs</strong> as the Customer 360 Data Model; you extend with custom DMOs where the standard model doesn't reach.</p>
+      <p>Hard requirement that blocks you immediately: for a <strong>Profile</strong> or <strong>Other</strong> DMO you must map its <strong>primary key</strong> field — without it the mapping will not save. For an <strong>Engagement</strong> DMO you must map both required fields, because engagement data is time-based by nature.</p>
+      <p><strong>Data bundles</strong> are Salesforce-authored data stream definitions that arrive pre-mapped to DMOs — deploy one and the mapping is done, then customize. Reach for these before hand-mapping anything standard.</p>
+
+      <h3>Category drives capability</h3>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Category</th><th>Meaning</th><th>Typical DMO</th></tr></thead>
+          <tbody>
+            <tr><th>Profile</th><td>Who someone is — one row per entity</td><td><code>Individual</code>, <code>Account</code>, <code>Contact Point Email</code></td></tr>
+            <tr><th>Engagement</th><td>Something that happened at a point in time — requires an event timestamp</td><td><code>Email Engagement</code>, <code>Web Engagement</code>, <code>Order</code></td></tr>
+            <tr><th>Other</th><td>Reference and lookup data</td><td><code>Product</code>, <code>Price Book</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <span class="tag">Early mistake</span>
+        <p>Getting the category wrong is the classic first stumble. Identity resolution runs on <strong>Profile</strong> or <strong>Other</strong> type streams — an <strong>Engagement</strong> DLO cannot be mapped to a Profile DMO, and if the category is incompatible Salesforce simply won't show the object in the selector. Conversely, time-windowed segment criteria (“opened an email in the last 30 days”) need the event timestamp that only Engagement data carries. Fixing either later means remapping.</p>
+      </div>
+      <p><strong>Data Spaces</strong> partition all of the above — by brand, region, or legal boundary — inside a single org. They are a priced add-on, not free tenancy.</p>
+    </section>
+
+    <section id="s4">
+      <h2><span class="n">04</span><span>Identity resolution</span></h2>
+      <p>The heart of the product. Two rule types live inside one <strong>ruleset</strong>:</p>
+      <ul>
+        <li><strong>Match rules</strong> — <em>which records are the same person?</em> Each rule pairs a field with a match method (<code>Exact</code>, <code>Fuzzy</code>, normalized variants). Every criterion inside a single rule must be satisfied for a link; multiple rules OR together.</li>
+        <li><strong>Reconciliation rules</strong> — <em>when linked records disagree, which value wins?</em> Most Recent, Most Frequent, Source Priority, and so on.</li>
+      </ul>
+      <p>Match logic is <strong>AND within a rule, OR across rules</strong>. A realistic ruleset reads: <em>fuzzy first name AND exact normalized address</em> — OR — <em>fuzzy first name AND exact party identifier</em>.</p>
+      <p>The output is the <strong>Unified Individual</strong>, plus unified link objects. Two documented limits worth knowing before you design: you can create <strong>up to two identity resolution rulesets</strong> per DMO, and unified profiles appear <strong>within 24 hours</strong> of first publishing a ruleset — so it is not an instant feedback loop.</p>
+      <div class="note">
+        <span class="tag">Critical property</span>
+        <p>Identity resolution <strong>never deletes or overwrites source data.</strong> It builds a linkage layer. A unified profile always traces back to its contributing source records, and a ruleset can be changed and re-run.</p>
+      </div>
+      <h3>Design guidance that saves pain</h3>
+      <ul>
+        <li>Start <strong>narrow and precise</strong> — exact email, exact phone — then loosen. An over-broad fuzzy name-plus-city rule collapses distinct humans into one profile, and it becomes very visible the moment marketing sends.</li>
+        <li>Every match rule you add costs credits on every run.</li>
+        <li>Party Identification and Contact Point DMOs usually make better match anchors than fields hanging directly off <code>Individual</code>.</li>
+      </ul>
+    </section>
+
+    <section id="s5">
+      <h2><span class="n">05</span><span>What you do with unified data</span></h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Capability</th><th>What it is</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><th>Calculated Insights</th><td>SQL-defined metrics and aggregates over DMOs — LTV, RFM, propensity inputs. Batch or streaming.</td><td>Recomputed on every refresh, and billed on every refresh</td></tr>
+            <tr><th>Segments</th><td>Filtered audiences over profile plus engagement data, published on a schedule or in real time</td><td>Rows <em>processed</em> is what's billed, not rows returned</td></tr>
+            <tr><th>Activations</th><td>Push a segment or insight to a target: Marketing Cloud, ad platforms, Agentforce, external systems</td><td>Target type affects the rate</td></tr>
+            <tr><th>Data Graphs</th><td>Pre-computed, denormalized JSON of a profile and its related data, cached for low-latency reads</td><td>The right tool for real-time personalization and agent grounding — avoids join-at-runtime</td></tr>
+            <tr><th>Query API / SQL</th><td>ANSI-flavoured SQL over DMOs via REST, backed by Hyper</td><td>How you integrate externally without building ETL</td></tr>
+            <tr><th>Data Actions</th><td>Event-driven triggers from Data 360 into Flow, Platform Events, webhooks</td><td>The “make something happen now” path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s6">
+      <h2><span class="n">06</span><span>Zero Copy — the structural shift</span></h2>
+      <p>The biggest change of the last two years. Rather than ingesting, Data 360 <strong>federates</strong>: it queries Snowflake, Databricks, BigQuery or Redshift in place and materializes nothing.</p>
+      <ul>
+        <li>Data stays in the warehouse; governance stays with the warehouse team.</li>
+        <li>Salesforce reports <strong>32 trillion records ingested in Q3 FY2026, 15 trillion of it through zero-copy connectors — up 341% year over year.</strong> <span class="flag">⚠ vendor figure</span></li>
+        <li>The cost profile differs sharply: commonly cited as <strong>~70 credits per million records</strong> for federated queries against <strong>~2,000</strong> for classic batch pipelines. <span class="flag">⚠ verify against your rate sheet</span></li>
+        <li>It runs both ways — Data Sharing lets the warehouse read Data 360 objects back.</li>
+      </ul>
+      <div class="note warn">
+        <span class="tag">The trade-off</span>
+        <p>Query latency now depends on <em>their</em> warehouse, and every federated query is a live cost on the warehouse side too. Federation doesn't remove the bill, it moves it — and it moves it to a team that may not have agreed to it.</p>
+      </div>
+      <p>Also in this family now: <strong>unstructured connectors for Google Drive and SharePoint</strong>, and <strong>Clean Rooms</strong> for multi-party collaboration without exposing raw data.</p>
+    </section>
+
+    <section id="s7">
+      <h2><span class="n">07</span><span>Unstructured data, vectors, agent grounding</span></h2>
+      <p>This is where Data 360 stops being a CDP and becomes AI infrastructure.</p>
+      <ul>
+        <li>Ingest unstructured content — PDFs, transcripts, docs, web pages, chat logs — then chunk, embed, and land it in a <strong>search index</strong>.</li>
+        <li>Native <strong>keyword, vector and hybrid indexing</strong>. Hybrid combines semantic recall with keyword precision.</li>
+        <li>Hyper runs <strong>ensemble queries across structured, keyword and vector indexes in a single call</strong> — the real differentiator against bolting a standalone vector database next to the CRM.</li>
+        <li>Consumed by <strong>Agentforce</strong> for RAG grounding and agent memory, plus prompt templates, Flow and Tableau.</li>
+        <li><strong>Intelligent Context</strong> is the layer explicitly connecting structured records to unstructured sources; <strong>Tableau Semantics</strong> supplies shared metric definitions so “active customer” means one thing everywhere.</li>
+      </ul>
+      <div class="note">
+        <span class="tag">“Why not just use a vector DB?”</span>
+        <p>Identity. Data 360 grounds retrieval in a <em>resolved</em> customer profile with entitlements and consent attached. A standalone vector store retrieves text; it has no idea whose text it is or whether you're allowed to use it.</p>
+      </div>
+    </section>
+
+    <section id="s8">
+      <h2><span class="n">08</span><span>The cost model</span></h2>
+      <p>Consumption-based, in three buckets:</p>
+      <ol class="prose">
+        <li><strong>Credits</strong> — ingest, transform, identity resolution, insights, segmentation, activation, queries</li>
+        <li><strong>Storage</strong> — per terabyte per month, billed separately</li>
+        <li><strong>Premium add-ons</strong> — Data Spaces, Real-Time Profiles and similar, at fixed cost</li>
+      </ol>
+      <p>Salesforce's documented formula is exact, and worth memorising because it is the whole model:</p>
+      <div class="note">
+        <span class="tag">Credit formula</span>
+        <p style="font-family: var(--mono); font-size: 17px;">credits = (d ÷ u) × m</p>
+        <p><strong>d</strong> = total data processed · <strong>u</strong> = unit, which is <strong>1 million for every usage type</strong> · <strong>m</strong> = the multiplier for that usage type, published in the rate card.</p>
+      </div>
+      <p>Salesforce groups billable usage into <strong>six categories</strong>. Learn these rather than a list of numbers — the categories are stable, the multipliers are not:</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Category</th><th>Covers</th></tr></thead>
+          <tbody>
+            <tr><th>Connect</th><td>Batch and streaming pipelines, data sharing, federation</td></tr>
+            <tr><th>Harmonize &amp; Unify</th><td>Data transforms, <strong>profile unification</strong></td></tr>
+            <tr><th>Analyze &amp; Predict</th><td>Calculated insights, inferences</td></tr>
+            <tr><th>Act</th><td>Data queries, streaming actions</td></tr>
+            <tr><th>Segment &amp; Activate</th><td>Segment processing, batch and streaming activation</td></tr>
+            <tr><th>Real-Time Processing</th><td>Real-time profiles and APIs, end to end</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <span class="tag">Two rules that are documented, unlike the rates</span>
+        <p><strong>Profile unification carries the highest rate multiplier of any usage type.</strong> That single fact should drive your design more than any other: ingest only active profiles, and don't re-run rulesets casually.</p>
+        <p><strong>Streaming consumes more credits than batch</strong> for the equivalent work. Reach for real-time only where the use case genuinely needs it.</p>
+      </div>
+      <p>Specific multipliers circulate widely in blog posts — Calculated Insights at 15, segment rows at 20, batch activation at 10, zero-copy federation around 70 against ~2,000 for classic batch pipelines. <strong>Treat every one of those as unverified.</strong> <span class="flag">⚠</span> Salesforce publishes multipliers only in the rate card, Trailhead's own <code>m=15</code> example is explicitly labelled illustrative, and the rates move between releases. Pull the current rate card before you put a number in front of anyone.</p>
+      <h3>Where budgets actually die</h3>
+      <ul>
+        <li>A Calculated Insight scheduled hourly that could run daily — twenty-four times the bill for the same answer.</li>
+        <li>Segments that re-process the full profile base every run instead of a filtered subset.</li>
+        <li>Over-broad identity resolution rulesets re-running across everything.</li>
+        <li>Ingesting data you never activate: storage plus ingest, zero return.</li>
+      </ul>
+      <div class="note">
+        <span class="tag">Mitigation pattern</span>
+        <p>Use a Data Cloud-triggered Flow, or a cheap Calculated Insight, as a gate — so expensive segment and insight runs only fire when the underlying data actually changed.</p>
+      </div>
+    </section>
+
+    <section id="s9">
+      <h2><span class="n">09</span><span>Common misconceptions</span></h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Belief</th><th>Reality</th></tr></thead>
+          <tbody>
+            <tr><td>“It's a data warehouse”</td><td>It's an activation layer. Reporting belongs in the warehouse — federate to it</td></tr>
+            <tr><td>“It's Marketing Cloud's CDP”</td><td>It's platform-wide: Sales, Service, Agentforce, Tableau, Flow</td></tr>
+            <tr><td>“Identity resolution merges records”</td><td>It <em>links</em> them. Sources are never modified</td></tr>
+            <tr><td>“Ingest everything, decide later”</td><td>Every stage is metered. Ingest against a named use case or don't ingest</td></tr>
+            <tr><td>“DMO mapping is one-time setup”</td><td>It's the core ongoing design surface, and where data quality is won or lost</td></tr>
+            <tr><td>“Zero Copy is free”</td><td>It shifts cost to the warehouse and adds a latency dependency</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s10">
+      <h2><span class="n">10</span><span>Learning path</span></h2>
+      <p>Ordered, and almost entirely free.</p>
+
+      <div class="phase">
+        <div class="phase-head"><span class="t">Phase 1</span><span class="h">Concepts</span><span class="est">4–6 h</span></div>
+        <ul>
+          <li><a href="https://trailhead.salesforce.com/data-cloud-trail">Data 360 Learning Journey</a> — the three-part progressive trail. Start here; it's the current one.</li>
+          <li><a href="https://trailhead.salesforce.com/content/learn/trails/unlock-your-data-with-data-cloud">Unlock Your Data with Data Cloud</a></li>
+          <li><a href="https://architect.salesforce.com/fundamentals/data-360-architecture">Data 360 Architecture</a> on Salesforce Architects — read this one properly even if you skim the Trailhead.</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="t">Phase 2</span><span class="h">Hands-on</span><span class="est">10–15 h</span></div>
+        <ul>
+          <li>Provision the special <strong>Data 360 hands-on org</strong> from the trail. <span class="flag">⚠ expires after 14 days</span> — don't provision it until you have a clear block of time.</li>
+          <li><a href="https://trailhead.salesforce.com/content/learn/modules/data-and-identity-in-salesforce-cdp/configure-identity-resolution-rules">Data and Identity in Data 360</a> — build a ruleset by hand, then deliberately break it with a too-loose rule and watch profiles collapse. That failure teaches more than the pass.</li>
+          <li><a href="https://trailhead.salesforce.com/content/learn/trails/data-360-develop-and-build-solutions">Data 360: Develop and Build Solutions</a></li>
+          <li><a href="https://developer.salesforce.com/agentforce-workshop/rag/1-ingest-unstructured-data-index">Agentforce RAG workshop</a> — ingest unstructured data and ground an agent on it.</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="t">Phase 3</span><span class="h">Depth</span></div>
+        <ul>
+          <li><a href="https://trailhead.salesforce.com/content/learn/modules/data-cloud-credit-consumption-quick-look/get-started-with-data-cloud-credit-consumption">Credit consumption module</a> — short, and the highest-leverage hour on this whole list.</li>
+          <li><a href="https://www.salesforce.com/data/connectivity/zero-copy/">Zero Copy connectivity</a></li>
+          <li><a href="https://trailhead.salesforce.com/credentials/data360consultant">Data 360 Consultant certification</a> and its <a href="https://trailhead.salesforce.com/content/learn/trails/prepare-for-your-salesforce-data-360-consultant-exam">prep trail</a>.</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="t">Reference</span><span class="h">Keep these open</span></div>
+        <ul>
+          <li><a href="https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-model-data.html">DMO &amp; Mapping developer guide</a></li>
+          <li><a href="https://help.salesforce.com/s/articleView?language=en_US&amp;id=data.c360_a_identity_resolution_ruleset.htm&amp;type=5">Identity Resolution Rulesets</a> in Salesforce Help</li>
+          <li><a href="https://www.salesforce.com/en-us/wp-content/uploads/sites/4/documents/platform/data-cloud-platform-services-rate-sheet-dc-9-04.pdf">Platform services rate sheet</a> — for current credit multipliers</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11">
+      <h2><span class="n">11</span><span>The 20% that gets you 80%</span></h2>
+      <ol class="takeaways">
+        <li><strong>DLO is raw, DMO is canonical</strong> — and the mapping between them is the job.</li>
+        <li><strong>Identity resolution is match rules plus reconciliation rules</strong> — who is the same, then which value wins. Sources are never mutated.</li>
+        <li><strong>Everything is metered per operation per million rows.</strong> Design for refresh frequency, not just correctness.</li>
+        <li><strong>Zero Copy is the default posture for warehouse data.</strong> Ingest only what you will activate.</li>
+        <li><strong>Its real job in 2026 is grounding Agentforce</strong> in resolved, consented customer context.</li>
+      </ol>
+    </section>
+
+  </main>
+
+  <footer>
+    Compiled 10 August 2026 from Salesforce Architects, Salesforce Developers, Trailhead and Salesforce Help. Figures marked ⚠ are vendor-published or move between releases — re-verify before quoting them to a customer.
+  </footer>
+
+</div>
+</body>
+</html>
