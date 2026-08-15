@@ -174,6 +174,68 @@
   #panel p.term { color: var(--ink); }
   #panel p.term b { color: var(--accent); }
 
+  /* ---------- what enters, what happens, what leaves ---------- */
+
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 9px 10px 10px;
+    background: rgba(0, 0, 0, 0.16);
+  }
+
+  .flowio { display: flex; align-items: stretch; gap: 8px; }
+
+  .fio { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .fio .k {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .fio .t { font-size: 11.5px; line-height: 1.4; color: var(--ink); }
+  .fio svg { display: block; }
+
+  /* The arrow sits on the shapes, not on the labels, so the eye reads
+     shape -> shape rather than word -> word. */
+  .farrow {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1;
+    color: var(--accent);
+    /* clears the ENTERS/LEAVES label so the arrow lands on the glyph row */
+    margin-top: 20px;
+    flex: 0 0 auto;
+  }
+
+  .finside { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .finside .h {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .finside li.s {
+    display: flex;
+    gap: 7px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+  .finside li.s i {
+    flex: 0 0 auto;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-style: normal;
+    color: var(--accent);
+    padding-top: 1px;
+  }
+
   .costline {
     font-family: var(--mono);
     font-size: 11.5px;
@@ -194,7 +256,19 @@
     letter-spacing: 0.05em;
     color: var(--violet);
   }
-  .chalhint.show { display: block; }
+  /* Sticky, so the flow block above can be as tall as it needs to be without
+     scrolling the one line that explains the Challenge button out of sight. */
+  .chalhint.show {
+    display: block;
+    position: sticky;
+    bottom: -15px;
+    margin: 0 -16px -15px;
+    padding: 9px 16px 15px;
+    /* opaque, not var(--panel): the body text scrolls underneath and would
+       otherwise show through the translucent panel colour */
+    background: var(--ground);
+    border-top: 1px solid var(--panel-edge);
+  }
   .chalhint b { color: var(--violet); font-weight: 400; border-bottom: 1px solid currentColor; }
 
   /* ---------- controls ---------- */
@@ -458,6 +532,14 @@
       <span class="chip" id="p-cat" style="color:var(--muted)">Connect</span>
     </div>
     <h2 id="p-name">Source Depot</h2>
+    <div class="flow" id="p-flow">
+      <div class="flowio">
+        <div class="fio"><span class="k">Enters</span><span id="f-in-shape"></span><span class="t" id="f-in"></span></div>
+        <div class="farrow">&rarr;</div>
+        <div class="fio"><span class="k">Leaves</span><span id="f-out-shape"></span><span class="t" id="f-out"></span></div>
+      </div>
+      <ol class="finside" id="p-inside"></ol>
+    </div>
     <p id="p-body">Loading&hellip;</p>
     <p class="term" id="p-term"></p>
     <div class="costline" id="p-cost"></div>
@@ -804,9 +886,152 @@
     }
   };
 
+  // What enters a stop, what the stop does to it, and what leaves. Keyed by stop
+  // name and merged below, the same way PUZZLES is. Every line here is drawn from
+  // the stop's own body/term text, which was checked against source — this table
+  // restates the mechanism, it does not add to it.
+  var FLOW = {
+    'Source Depots': {
+      in:  { shape: 'none', t: 'Nothing — this is where the route starts' },
+      inside: [
+        'Three systems each hold records about the same handful of people',
+        'Each keeps its own field names, formats and idea of a "customer"',
+        'Data sitting in a source system costs nothing in Data 360'
+      ],
+      out: { shape: 'ragged', t: 'CRM, SDK and warehouse records — three native shapes' }
+    },
+    'Data Stream': {
+      in:  { shape: 'ragged', t: 'Records sitting in a source system' },
+      inside: [
+        'The connector reads the source-side schema as a DSO',
+        'You choose batch or streaming — streaming costs more for equivalent work',
+        'The pipe is configured and starts delivering rows'
+      ],
+      out: { shape: 'ragged', t: 'A configured pipe delivering rows into Data 360' }
+    },
+    'DLO Yard': {
+      in:  { shape: 'ragged', t: 'Rows arriving from the stream' },
+      inside: [
+        'Rows are written down exactly as they arrived',
+        'Original field names and formats are preserved',
+        'Nothing is cleaned, renamed or reshaped at this layer'
+      ],
+      out: { shape: 'ragged', t: 'A DLO — faithful raw storage of what was ingested' }
+    },
+    'Transform Works': {
+      in:  { shape: 'ragged', t: 'Raw DLO rows, original mess intact' },
+      inside: [
+        'Formula fields and type fixes are applied',
+        'Rows you will never activate are filtered out',
+        'Cheapest place to drop weight — every later stop bills what survives'
+      ],
+      out: { shape: 'clean', t: 'A cleaned DLO, carrying fewer rows' }
+    },
+    'Mapping Hall': {
+      in:  { shape: 'clean', t: 'Cleaned DLO fields, still in source shape' },
+      inside: [
+        'Source fields are mapped onto the Customer 360 Data Model',
+        'Five systems describing a person all land in the same Individual object',
+        'Mapping is ongoing design work, not a one-time setup task'
+      ],
+      out: { shape: 'canonical', t: 'A DMO — one canonical shape across every source' }
+    },
+    'Category Gate': {
+      in:  { shape: 'canonical', t: 'A mapped DMO, not yet stamped' },
+      inside: [
+        'Each DMO is stamped Profile, Engagement or Other',
+        'Profile and Other need a primary key mapped, or the mapping will not save',
+        'Engagement must carry an event timestamp'
+      ],
+      out: { shape: 'canonical', t: 'A categorised DMO — the stamp decides what it can do next' }
+    },
+    'Match Plaza': {
+      in:  { shape: 'canonical', t: 'Categorised Profile or Other DMOs from three sources' },
+      inside: [
+        'Each match rule pairs a field with a method — exact, fuzzy or normalized',
+        'Logic is AND within a rule, OR across rules',
+        'Start narrow and loosen — a broad rule collapses distinct people into one'
+      ],
+      out: { shape: 'linked', t: 'Candidate records, linked as the same person' }
+    },
+    'Reconciliation Tower': {
+      in:  { shape: 'linked', t: 'Linked records that disagree with each other' },
+      inside: [
+        'Reconciliation rules decide which value surfaces',
+        'Most Recent, Most Frequent or Source Priority picks the winner',
+        'The values that lose are not thrown away'
+      ],
+      out: { shape: 'linked', t: 'One surfaced value per field, losers still on record' }
+    },
+    'Unified Individual': {
+      in:  { shape: 'linked', t: 'Reconciled values plus the untouched source records' },
+      inside: [
+        'A linkage layer is built on top of the originals',
+        'Nothing is merged, overwritten or deleted',
+        'Max two rulesets per DMO; profiles appear within 24h of first publish'
+      ],
+      out: { shape: 'unified', t: 'A unified profile, still traceable back to every source' }
+    },
+    'Insights Foundry': {
+      in:  { shape: 'unified', t: 'Unified profiles and the DMOs behind them' },
+      inside: [
+        'SQL defines a metric over DMOs — lifetime value, RFM, propensity inputs',
+        'The metric is recomputed on every refresh',
+        'Billing is per run, so refresh frequency drives the cost'
+      ],
+      out: { shape: 'derived', t: 'A Calculated Insight — a metric attached to each profile' }
+    },
+    'Segment Yard': {
+      in:  { shape: 'unified', t: 'Profile data plus engagement data' },
+      inside: [
+        'Filter gates narrow the population into an audience',
+        'Rows processed are billed, not rows returned',
+        'A full-base scan costs the same for ten people as for ten million'
+      ],
+      out: { shape: 'derived', t: 'An audience — the membership list for a segment' }
+    },
+    'Data Graph Depot': {
+      in:  { shape: 'unified', t: 'A profile and everything related to it' },
+      inside: [
+        'Related objects are pre-computed and denormalized',
+        'The parcel is cached as JSON',
+        'No joins run at read time — answers come back in milliseconds'
+      ],
+      out: { shape: 'derived', t: 'A data graph parcel, ready for real-time reads' }
+    },
+    'Vector Wing': {
+      in:  { shape: 'ragged', t: 'Unstructured content — PDFs, transcripts, SharePoint and Drive' },
+      inside: [
+        'Documents are chunked, then embedded',
+        'Chunks are shelved into keyword, vector and hybrid indexes',
+        'Hyper runs one ensemble query across structured tables and both index types'
+      ],
+      out: { shape: 'derived', t: 'Searchable indexes that still know whose content this is' }
+    },
+    'Query API Dock': {
+      in:  { shape: 'unified', t: 'DMOs held in Data 360' },
+      inside: [
+        'An external system sends ANSI-flavoured SQL over REST',
+        'Hyper executes the query',
+        'No ETL job is built or scheduled to get the data out'
+      ],
+      out: { shape: 'derived', t: 'A resultset returned to the calling system' }
+    },
+    'Activation Gates': {
+      in:  { shape: 'derived', t: 'An audience, an insight or a data graph parcel' },
+      inside: [
+        'Attributes are mapped to what each destination expects',
+        'The parcel departs for Agentforce, Marketing Cloud, ad platforms, Flow and Tableau',
+        'The only stop that produces business value — everything upstream was cost'
+      ],
+      out: { shape: 'sent', t: 'Resolved customer context, delivered to the destination' }
+    }
+  };
+
   STOPS.forEach(function (s) {
     if (!s.quiz && PUZZLES[s.name]) s.quiz = PUZZLES[s.name];
     if (s.quiz && !s.quiz.type) s.quiz.type = 'choice';
+    if (FLOW[s.name]) s.flow = FLOW[s.name];
   });
 
   // Route waypoints: travel in x along a row, then step in y between rows.
@@ -926,6 +1151,9 @@
 
   var DWELL = 3.2;
 
+  // Read once from the stylesheet so the flow glyphs stay in step with the palette.
+  var MUTED = (getComputedStyle(document.documentElement).getPropertyValue('--muted') || '').trim() || '#74829A';
+
   // ------------------------------------------------------------------ HUD
 
   var el = {
@@ -940,8 +1168,69 @@
     cost: document.getElementById('p-cost'),
     prog: document.getElementById('progbar'),
     play: document.getElementById('b-play'),
-    chal: document.getElementById('p-chal')
+    chal: document.getElementById('p-chal'),
+    flow: document.getElementById('p-flow'),
+    inShape: document.getElementById('f-in-shape'),
+    outShape: document.getElementById('f-out-shape'),
+    fin: document.getElementById('f-in'),
+    fout: document.getElementById('f-out'),
+    inside: document.getElementById('p-inside')
   };
+
+  // The shape of the data is the lesson: ragged source rows become one canonical
+  // form, then a single unified profile, then something derived from it. Drawing
+  // it beats describing it.
+  function shapeSvg(kind, color) {
+    var bar = function (x, y, w, o) {
+      return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="4" rx="1" fill="' +
+        color + '" opacity="' + o + '"/>';
+    };
+    var body =
+      kind === 'none' ? '<line x1="4" y1="10" x2="40" y2="10" stroke="' + color +
+          '" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>'
+    : kind === 'ragged' ? bar(2, 2, 24, 0.9) + bar(9, 8, 16, 0.7) + bar(5, 14, 28, 0.8)
+    : kind === 'clean' ? bar(2, 2, 28, 0.9) + bar(2, 8, 20, 0.7) + bar(2, 14, 25, 0.8)
+    : kind === 'canonical' ? bar(2, 2, 26, 0.9) + bar(2, 8, 26, 0.9) + bar(2, 14, 26, 0.9)
+    : kind === 'linked' ? '<path d="M5 4 V16 M5 4 H9 M5 10 H9 M5 16 H9" stroke="' + color +
+          '" stroke-width="1.5" fill="none" opacity="0.8"/>' +
+          bar(10, 2, 22, 0.9) + bar(10, 8, 22, 0.9) + bar(10, 14, 22, 0.9)
+    : kind === 'unified' ? '<polygon points="22,2 34,10 22,18 10,10" fill="' + color + '" opacity="0.95"/>'
+    : kind === 'derived' ? '<polygon points="14,3 30,3 36,10 30,17 14,17 8,10" fill="' + color + '" opacity="0.9"/>'
+    : kind === 'sent' ? '<path d="M3 10 H30" stroke="' + color + '" stroke-width="2.5" opacity="0.9"/>' +
+          '<polygon points="29,4 41,10 29,16" fill="' + color + '" opacity="0.95"/>'
+    : '';
+    return '<svg width="44" height="20" viewBox="0 0 44 20" aria-hidden="true">' + body + '</svg>';
+  }
+
+  function paintFlow(s) {
+    var f = s.flow;
+    if (!f) { el.flow.style.display = 'none'; return; }
+    el.flow.style.display = '';
+
+    // Entering is drawn muted, leaving in the district's colour, so the eye reads
+    // the stop as the thing that changed the data.
+    el.inShape.innerHTML = shapeSvg(f.in.shape, MUTED);
+    el.outShape.innerHTML = shapeSvg(f.out.shape, s.d.color);
+    el.fin.textContent = f.in.t;
+    el.fout.textContent = f.out.t;
+
+    el.inside.innerHTML = '';
+    var head = document.createElement('li');
+    head.className = 'h';
+    head.textContent = 'Inside this stop';
+    el.inside.appendChild(head);
+    f.inside.forEach(function (step, i) {
+      var li = document.createElement('li');
+      li.className = 's';
+      var n = document.createElement('i');
+      n.textContent = String(i + 1);
+      var txt = document.createElement('span');
+      txt.textContent = step;
+      li.appendChild(n);
+      li.appendChild(txt);
+      el.inside.appendChild(li);
+    });
+  }
 
   function multiplierFor(s) {
     // The Zero-Copy lever: federation replaces the batch pipeline at the
@@ -964,6 +1253,7 @@
     el.body.innerHTML = s.body;
     el.term.innerHTML = s.term || '';
     el.term.style.display = s.term ? '' : 'none';
+    paintFlow(s);
 
     if (m > 0) {
       var c = (RECORDS / UNIT) * m;
