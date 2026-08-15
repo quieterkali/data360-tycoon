@@ -184,6 +184,19 @@
   }
   .costline b { color: var(--gold); font-weight: 400; }
 
+  /* Shown while a challenge is armed but not yet raised, so the reader knows
+     the question is waiting rather than being ambushed by it. */
+  .chalhint {
+    display: none;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    letter-spacing: 0.05em;
+    color: var(--violet);
+  }
+  .chalhint.show { display: block; }
+  .chalhint b { color: var(--violet); font-weight: 400; border-bottom: 1px solid currentColor; }
+
   /* ---------- controls ---------- */
 
   #controls {
@@ -217,6 +230,8 @@
   #controls button.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #controls button.btn.on { border-color: var(--accent); color: var(--accent); }
   #controls button.btn.primary { border-color: var(--accent); color: var(--accent); min-width: 92px; }
+  #controls button.btn.chal { border-color: var(--violet); color: var(--violet); }
+  #controls button.btn.chal:hover { border-color: var(--violet); color: var(--violet); background: rgba(155, 127, 212, 0.16); }
 
   .speed { display: flex; align-items: center; gap: 7px; margin-left: auto; }
   .speed label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
@@ -446,6 +461,7 @@
     <p id="p-body">Loading&hellip;</p>
     <p class="term" id="p-term"></p>
     <div class="costline" id="p-cost"></div>
+    <div class="chalhint" id="p-chal">Challenge waiting &mdash; read this stop, then press <b>Challenge</b>.</div>
   </div>
 
   <div id="controls">
@@ -905,7 +921,7 @@
     seen: {},
     score: 0,
     answeredHere: false,
-    pendingIntro: true
+    pending: null    // challenge armed at this stop, waiting for the reader
   };
 
   var DWELL = 3.2;
@@ -923,7 +939,8 @@
     term: document.getElementById('p-term'),
     cost: document.getElementById('p-cost'),
     prog: document.getElementById('progbar'),
-    play: document.getElementById('b-play')
+    play: document.getElementById('b-play'),
+    chal: document.getElementById('p-chal')
   };
 
   function multiplierFor(s) {
@@ -978,7 +995,30 @@
     charge(i);
     paintPanel();
     var s = STOPS[i];
-    if (s.quiz && !st.seen[i]) { st.seen[i] = true; openQuiz(s.quiz); }
+    if (s.quiz && !st.seen[i]) { st.seen[i] = true; armQuiz(s.quiz); }
+  }
+
+  // Arrival used to raise the modal in the same tick as the panel repaint, so
+  // the stop's text was covered the instant it appeared and there was no way
+  // to read it first. The challenge is now armed instead of opened: the tour
+  // parks, the panel stays clear, and the reader raises the question when they
+  // are done reading.
+  function armQuiz(q) {
+    st.pending = q;
+    wasPlaying = st.playing;
+    st.playing = false;
+    el.chal.classList.add('show');
+    setPlayLabel();
+  }
+
+  // Returns true if it consumed the interaction by raising the armed challenge.
+  function chalGate() {
+    if (!st.pending) return false;
+    var q = st.pending;
+    st.pending = null;
+    el.chal.classList.remove('show');
+    openQuiz(q);
+    return true;
   }
 
   // ------------------------------------------------------------------ quiz
@@ -1133,7 +1173,8 @@
   }
 
   function openQuiz(q) {
-    wasPlaying = st.playing;
+    // wasPlaying is captured by armQuiz, at the moment the tour parked — by the
+    // time the reader raises the question the tour is already paused.
     st.playing = false;
     setPlayLabel();
     st.quizOpen = true;
@@ -1168,7 +1209,11 @@
   // -------------------------------------------------------------- controls
 
   function setPlayLabel() {
-    el.play.textContent = st.playing ? '\u275a\u275a Pause' : '\u25b6 Play';
+    // While a challenge is armed the primary button raises it, so the reader
+    // never has to hunt for a second control to carry on.
+    el.play.textContent = st.pending ? '\u25c6 Challenge'
+      : st.playing ? '\u275a\u275a Pause' : '\u25b6 Play';
+    el.play.classList.toggle('chal', !!st.pending);
   }
 
   function nextStop() {
@@ -1191,38 +1236,31 @@
     // desynced from a tour that had already gone back to stop 1.
     qz.classList.remove('show');
     st.quizOpen = false;
+    st.pending = null;
+    el.chal.classList.remove('show');
     wasPlaying = false;
     st.playing = false;
     setPlayLabel();
 
     st.seg = 0; st.t = 0; st.dwell = DWELL; st.credits = 0;
     st.charged = {}; st.seen = {}; st.current = 0;
-    st.score = 0; st.pendingIntro = true;
-    // The opening question is gated behind the first Play, so the park is on
-    // screen before a modal covers it.
-    st.seen[0] = true;
+    st.score = 0;
     paintScore();
+    // Arms the opening challenge rather than raising it, so the park and the
+    // first stop's text are on screen for as long as the reader wants.
     arriveAt(0);
+    wasPlaying = true;    // answering the opener starts the tour
     centreOn(STOPS[0], true);
-  }
-
-  // Returns true if it consumed the interaction by opening the opening question.
-  function introGate() {
-    if (!st.pendingIntro) return false;
-    st.pendingIntro = false;
-    st.playing = true;              // so answering it starts the tour
-    openQuiz(STOPS[0].quiz);
-    return true;
   }
 
   // Both are no-ops while a checkpoint is open, or the tour advances behind
   // the modal and the panel stops matching the question on screen.
   document.getElementById('b-play').addEventListener('click', function () {
-    if (st.quizOpen || introGate()) return;
+    if (st.quizOpen || chalGate()) return;
     st.playing = !st.playing; setPlayLabel();
   });
   document.getElementById('b-step').addEventListener('click', function () {
-    if (st.quizOpen || introGate()) return;
+    if (st.quizOpen || chalGate()) return;
     nextStop();
   });
   document.getElementById('b-reset').addEventListener('click', reset);
@@ -1531,11 +1569,9 @@
   paintPanel();
   requestAnimationFrame(frame);
 
-  // After a beat to take in the park, the opening question appears; answering
-  // it starts the tour.
-  setTimeout(function () {
-    if (!st.quizOpen) introGate();
-  }, 2800);
+  // No timer raises the opening question any more. It is armed by reset() and
+  // waits on the Challenge button, so 2.8 seconds is never the budget for
+  // taking in the park and reading the first stop.
 
 })();
 </script>
